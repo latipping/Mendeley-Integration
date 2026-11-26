@@ -136,8 +136,8 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd-msg{color:var(--rd-muted);text-align:center;margin-top:3em}
 .rd-msg-box{text-align:left;max-width:30em;margin:2em auto;font-family:var(--sans);font-size:1rem;line-height:1.5}
 .rd-msg-box ol{padding-left:1.2rem}
-.rd-bar{position:absolute;left:8px;right:8px;top:calc(100% + 8px);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 10px;background:var(--rd-ink);color:var(--rd-bg);border-radius:16px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.28);z-index:6}
-.rd-hint{flex-basis:100%;text-align:center;font-size:.88rem;font-weight:500}
+.rd-bar{position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 8px);display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;white-space:nowrap;background:var(--rd-ink);color:var(--rd-bg);border-radius:16px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.28);z-index:6}
+.rd-title.hint{color:var(--rd-accent);font-family:var(--sans);font-weight:600}
 .rd-bar .nb.warn{color:#FFB4A8}
 .rd-tb[aria-pressed="true"]{background:var(--rd-accent);color:var(--rd-bg)}
 .rd.tapmode .rd-text{cursor:pointer}
@@ -1177,13 +1177,13 @@ async function extractModel(pdf, onProg){
       let lastIdx = -1; for (let k = para.t.length - 1; k >= 0; k--){ if (para.t[k] !== " "){ lastIdx = para.t[k]; break; } }
       const firstIdx = l.it.find(i => i !== " ");
       const li = items[lastIdx];
-      if (li && /[a-z]-$/i.test(li.s) && /^[a-z]/.test(items[firstIdx].s)) li.dh = 1;
-      else para.t.push(" ");
+      if (li && /[a-z]{2}-$/.test(li.s) && /^[a-z]/.test(items[firstIdx].s)) li.dh = 1;
+      else if (!(li && /-$/.test(li.s))) para.t.push(" ");
     }
     l.it.forEach(i => { para.t.push(i); if (i !== " ") items[i].l = l.id; });
     prev = l;
   }
-  return { v: 1, items: items, paras: paras };
+  return { v: 2, items: items, paras: paras };
 }
 
 /* ---------- Opening the reader ---------- */
@@ -1191,7 +1191,7 @@ async function openReader(docId){
   const d = S.lib.get(docId); if (!d) return;
   const gen = ++R.gen;
   R.docId = docId; R.model = null; R.anns = []; R.spanEls = []; R.touched = []; R.file = null;
-  $("#rdTitle").textContent = d.title || "Paper";
+  R.title = d.title || "Paper"; $("#rdTitle").textContent = R.title; $("#rdTitle").classList.remove("hint");
   applyReaderSettings();
   $("#rdSet").hidden = true; $("#rdSetBtn").setAttribute("aria-expanded", "false");
   hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
@@ -1205,7 +1205,7 @@ async function openReader(docId){
   if (!f) return readerError("Mendeley has no PDF attached to this paper.", false);
   R.file = f;
   let model = await DB.get("txt:" + f.id).catch(() => null);
-  if (!model || model.v !== 1){
+  if (!model || model.v !== 2){
     let buf = await DB.get("pdf:" + f.id).catch(() => null);
     if (!buf){
       try { buf = await downloadPdf(f); await cachePdf(f.id, buf); }
@@ -1407,7 +1407,6 @@ function updateBar(){
   if (!R.model || !$("#rd").classList.contains("open")){ bar.hidden = true; return; }
   const kids = [];
   if (R.lastRange){
-    if (R.tapMode && R.tapStage === 1) kids.push(el("span", { class: "rd-hint", text: "Tap the last word, or pick a colour now" }));
     HL.forEach((h, ci) => {
       const b = el("button", { class: "rd-dot", "aria-label": "Highlight " + h.name });
       b.style.setProperty("--hl", rgb(h.c));
@@ -1422,12 +1421,23 @@ function updateBar(){
         removeHighlights(over);
       }));
     }
-    kids.push(barButton(el("button", { class: "nb", "aria-label": "Cancel selection", text: "✕" }), cancelSelection));
-  } else if (R.tapMode){
-    kids.push(el("span", { class: "rd-hint", text: "Tap the first word you want to highlight" }));
-    kids.push(barButton(el("button", { class: "nb", text: "Done" }), () => setTapMode(false)));
-  } else { bar.hidden = true; return; }
+    const x = el("button", { class: "nb", "aria-label": "Cancel selection", text: "✕" });
+    x.addEventListener("click", cancelSelection);
+    kids.push(x);
+  }
+  updateTitle();
+  if (!kids.length){ bar.hidden = true; bar.replaceChildren(); return; }
   bar.replaceChildren(...kids); bar.hidden = false;
+}
+function updateTitle(){
+  const t = $("#rdTitle");
+  if (R.tapMode){
+    t.textContent = R.tapStage === 1 ? "Now tap the last word" : "Tap the first word";
+    t.classList.add("hint");
+  } else {
+    t.textContent = R.title || "Paper";
+    t.classList.remove("hint");
+  }
 }
 function hideBar(){ clearTimeout(barHideTimer); $("#rdBar").hidden = true; }
 function cancelSelection(){
