@@ -663,6 +663,11 @@ function buildLibraryShell(app){
     el("div", { id: "listFoot" }),
     el("p", { class: "hint", style: "margin-top:28px" },
       el("button", { class: "btn quiet small", text: "Export for Claude", onclick: openExport }),
+      el("button", { class: "btn quiet small", text: "E-book of this list", onclick: () => {
+        const docs = visible(); if (!docs.length){ toast("The list is empty."); return; }
+        const f = S.view.folder && S.folders.find(x => x.id === S.view.folder);
+        openEbook(docs, f ? f.name : (S.view.tag ? S.view.tag : "My papers"));
+      }}),
       el("button", { class: "btn quiet small", text: "Full resync", onclick: () => sync({ full: true }) }),
       el("button", { class: "btn quiet small", text: "Sign out", onclick: () => { if (S.outbox.length && !confirmSignOut()) return; signOut(); } }))
   );
@@ -781,7 +786,8 @@ function fillSheet(){
         : el("button", { class: "btn", text: "Attach PDF", onclick: () => $("#pdfIn").click() }),
       el("button", { class: "btn line", text: d.read ? "Mark unread" : "Mark read", onclick: () => edit(d.id, { read: !d.read }) }),
       el("button", { class: "btn line", text: "Edit details", onclick: () => openEdit(d.id) }),
-      el("button", { class: "btn line", text: "Update from DOI or ISBN", onclick: () => openLookup(d.id) })
+      el("button", { class: "btn line", text: "Update from DOI or ISBN", onclick: () => openLookup(d.id) }),
+      d.file_attached ? el("button", { class: "btn line", text: "E-book", onclick: () => openEbook([d], d.title || "Paper") }) : null
     ),
     doi ? el("div", { class: "section" }, el("h3", { text: "DOI" }), el("a", { class: "doi", href: "https://doi.org/" + encodeURI(doi), target: "_blank", rel: "noopener noreferrer", text: doi })) : null,
     !doi && web ? el("div", { class: "section" }, el("h3", { text: "Link" }), el("a", { class: "doi", href: web, target: "_blank", rel: "noopener noreferrer", text: web })) : null,
@@ -1089,7 +1095,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 10" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 12" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1955,6 +1961,313 @@ function openFolders(){
     el("div", { class: "section" }, el("h3", { text: tree.length ? "Your folders" : "You don’t have any folders yet" }),
       tree.length ? el("p", { class: "hint", text: "Tap a folder to show its papers. Deleting a folder doesn’t delete the papers in it." }) : null,
       ...rows));
+  $("#sheet").classList.add("open"); $("#sheet").scrollTop = 0;
+}
+
+/* ================= E-book export (EPUB) ================= */
+const OD_BASE = "https://cdn.jsdelivr.net/gh/antijingoist/opendyslexic@1824da5c0e41dc3e13ffc7f3a636dcaf695d61b7/compiled/";
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8){ let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files){
+  const enc = new TextEncoder(); const chunks = [], central = []; let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  for (const f of files){
+    const name = enc.encode(f.name), data = f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0, true); h.setUint16(8, 0, true);
+    h.setUint16(10, dosTime, true); h.setUint16(12, dosDate, true); h.setUint32(14, crc, true);
+    h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    chunks.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0, true); c.setUint16(10, 0, true);
+    c.setUint16(12, dosTime, true); c.setUint16(14, dosDate, true); c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+    c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+  return new Blob(chunks.concat(central, [new Uint8Array(e.buffer)]), { type: "application/epub+zip" });
+}
+function cleanXml(s){
+  s = String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "");
+  let out = "";
+  for (let i = 0; i < s.length; i++){
+    const c = s.charCodeAt(i);
+    if (c >= 0xD800 && c <= 0xDBFF){ const d = s.charCodeAt(i + 1); if (d >= 0xDC00 && d <= 0xDFFF){ out += s[i] + s[i + 1]; i++; } continue; }
+    if (c >= 0xDC00 && c <= 0xDFFF) continue;
+    out += s[i];
+  }
+  return out;
+}
+const xesc = s => cleanXml(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const xhtmlDoc = (title, body) => '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-GB" lang="en-GB">\n<head>\n<meta charset="UTF-8"/>\n<title>' + xesc(title) + '</title>\n<link rel="stylesheet" type="text/css" href="style.css"/>\n</head>\n<body>\n' + body + '\n</body>\n</html>\n';
+
+async function exportSource(d, needPdf, onStatus){
+  if (!d.file_attached) return null;
+  let f = null;
+  try { f = await fileMetaFor(d.id); } catch (e) { return null; }
+  if (!f) return null;
+  const short = (d.title || "paper").slice(0, 40);
+  let m = await DB.get("txt:" + f.id).catch(() => null);
+  if (m && m.v !== 2) m = null;
+  let buf = null;
+  if (!m || needPdf){
+    buf = await DB.get("pdf:" + f.id).catch(() => null);
+    if (!buf){
+      try { onStatus("Downloading “" + short + "”…"); buf = await downloadPdf(f); await cachePdf(f.id, buf); }
+      catch (e) { buf = null; }
+    }
+  }
+  if (!m && buf){
+    try {
+      onStatus("Reading “" + short + "”…");
+      const pdf = await loadPdfDoc(buf);
+      m = await extractModel(pdf);
+      pdf.destroy();
+      DB.set("txt:" + f.id, m).catch(() => {});
+    } catch (e) { m = null; }
+  }
+  return m || buf ? { m: m, buf: buf } : null;
+}
+const CAPTION = /^(Fig\.?|FIG\.?|Figure|FIGURE|Table|TABLE|Exhibit|EXHIBIT|Chart|Plate|Scheme)\s*[0-9IVX]+/;
+function captionPages(m){
+  const lines = new Map();
+  m.items.forEach(it => { if (it.l === undefined) return; if (!lines.has(it.l)) lines.set(it.l, { p: it.p, t: "" }); lines.get(it.l).t += it.s; });
+  const pages = new Set();
+  lines.forEach(v => { if (CAPTION.test(v.t.trim())) pages.add(v.p); });
+  return pages;
+}
+async function pageHasImage(page){
+  try {
+    const O = window.pdfjsLib.OPS; const ops = await page.getOperatorList();
+    return ops.fnArray.some(fn => fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat || (O.paintJpegXObject !== undefined && fn === O.paintJpegXObject));
+  } catch (e) { return false; }
+}
+async function renderPageJpeg(page){
+  const vp1 = page.getViewport({ scale: 1 });
+  const vp = page.getViewport({ scale: Math.min(3, 1200 / vp1.width) });
+  const c = document.createElement("canvas"); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const img = ctx.getImageData(0, 0, c.width, c.height), px = img.data;
+  for (let i = 0; i < px.length; i += 4){ const y = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000; px[i] = px[i + 1] = px[i + 2] = y; }
+  ctx.putImageData(img, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.72));
+  c.width = 0; c.height = 0;
+  if (!blob) throw new Error("render failed");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+async function figurePages(buf, m, ch, onStatus, addFile){
+  const out = [];
+  let pdf;
+  try { pdf = await loadPdfDoc(buf); } catch (e) { return out; }
+  try {
+    const want = captionPages(m);
+    for (let n = 2; n <= pdf.numPages; n++){ if (want.has(n)) continue; const page = await pdf.getPage(n); if (await pageHasImage(page)) want.add(n); page.cleanup(); }
+    const pages = Array.from(want).filter(n => n >= 1 && n <= pdf.numPages).sort((a, b) => a - b).slice(0, 30);
+    for (let k = 0; k < pages.length; k++){
+      onStatus("Adding figure pages (" + (k + 1) + " of " + pages.length + ")…");
+      try {
+        const page = await pdf.getPage(pages[k]);
+        const jpg = await renderPageJpeg(page); page.cleanup();
+        const href = "images/c" + ch + "-p" + pages[k] + ".jpg";
+        addFile("OEBPS/" + href, jpg);
+        out.push({ page: pages[k], href: href });
+      } catch (e) {}
+    }
+  } finally { try { pdf.destroy(); } catch (e) {} }
+  return out;
+}
+function coverMap(m, hls){
+  const byPage = new Map();
+  m.items.forEach((it, i) => { if (it.l === undefined) return; let a = byPage.get(it.p); if (!a){ a = []; byPage.set(it.p, a); } a.push(i); });
+  const cover = new Map();
+  hls.forEach(a => (a.positions || []).forEach(pos => {
+    if (!pos || !pos.top_left || !pos.bottom_right) return;
+    const xl = Math.min(pos.top_left.x, pos.bottom_right.x), xr = Math.max(pos.top_left.x, pos.bottom_right.x);
+    const yb = Math.min(pos.top_left.y, pos.bottom_right.y), yt = Math.max(pos.top_left.y, pos.bottom_right.y);
+    for (const i of (byPage.get(pos.page) || [])){
+      const it = m.items[i];
+      const ib = it.y - it.h * 0.2, itp = it.y + it.h * 0.8;
+      if (Math.min(yt, itp) - Math.max(yb, ib) < it.h * 0.4) continue;
+      if (xr < it.x || xl > it.x + it.w) continue;
+      const L = it.s.length, cw = it.w / Math.max(1, L);
+      const s = Math.max(0, Math.min(L, Math.round((xl - it.x) / cw))), e = Math.max(0, Math.min(L, Math.round((xr - it.x) / cw)));
+      if (e <= s) continue;
+      let arr = cover.get(i); if (!arr){ arr = new Array(L).fill(0); cover.set(i, arr); }
+      for (let k = s; k < e; k++) arr[k] = 1;
+    }
+  }));
+  return cover;
+}
+function chapterXhtml(d, m, anns, opts, figs){
+  figs = (figs || []).slice();
+  const figHtml = f => '<div class="figpage"><img src="' + f.href + '" alt="Page ' + f.page + ' of the original PDF"/><p class="caption">Page ' + f.page + " of the original</p></div>";
+  const out = [];
+  out.push("<h1>" + xesc(d.title || "Untitled") + "</h1>");
+  if (d.authors && d.authors.length) out.push('<p class="meta">' + xesc(fullAuthors(d.authors)) + "</p>");
+  const pub = [venue(d), d.year].filter(Boolean).join(", ");
+  if (pub) out.push('<p class="meta"><i>' + xesc(pub) + "</i></p>");
+  if (d.identifiers && d.identifiers.doi) out.push('<p class="meta">DOI ' + xesc(d.identifiers.doi) + "</p>");
+  const hls = anns.filter(a => a.type === "highlight");
+  if (m && m.paras.length){
+    const cover = opts.marks ? coverMap(m, hls) : new Map();
+    const itemHtml = i => {
+      const text = disp(m.items[i]); const arr = cover.get(i);
+      if (!arr) return xesc(text);
+      let h = "", k = 0;
+      while (k < text.length){ const on = arr[k] || 0; let j = k; while (j < text.length && (arr[j] || 0) === on) j++; const chunk = xesc(text.slice(k, j)); h += on ? '<span class="hl">' + chunk + "</span>" : chunk; k = j; }
+      return h;
+    };
+    m.paras.forEach(p => {
+      const first = p.t.find(t => t !== " ");
+      const startPage = first !== undefined ? m.items[first].p : 0;
+      while (figs.length && figs[0].page < startPage) out.push(figHtml(figs.shift()));
+      const inner = p.t.map(t => t === " " ? " " : itemHtml(t)).join("").replace(/\s+/g, " ").trim();
+      if (!inner) return;
+      if (p.k === "h") out.push("<h2>" + inner + "</h2>");
+      else out.push(p.k === "s" ? '<p class="small">' + inner + "</p>" : "<p>" + inner + "</p>");
+    });
+    while (figs.length) out.push(figHtml(figs.shift()));
+  } else {
+    if (d.abstract) out.push("<h2>Abstract</h2>", "<p>" + xesc(d.abstract) + "</p>");
+    out.push('<p class="note">' + (d.file_attached ? "The PDF’s text couldn’t be read, so only the details are included." : "This paper has no PDF in Mendeley, so only the details are included.") + "</p>");
+  }
+  if (opts.notes){
+    const notes = anns.filter(a => a.type === "note" && a.text).map(a => stripHtml(a.text)).filter(Boolean);
+    const marks = anns.filter(a => a.type === "highlight" || a.type === "sticky_note").sort((a, b) => {
+      const pa = (a.positions && a.positions[0]) || {}, pb = (b.positions && b.positions[0]) || {};
+      return (pa.page || 0) - (pb.page || 0) || ((pb.top_left && pb.top_left.y) || 0) - ((pa.top_left && pa.top_left.y) || 0);
+    });
+    if (notes.length || marks.length){
+      out.push("<h2>My highlights and notes</h2>");
+      notes.forEach(n => out.push('<p class="mynote">' + xesc(n) + "</p>"));
+      marks.forEach(a => {
+        const page = a.positions && a.positions[0] && a.positions[0].page;
+        const where = page ? "p. " + page + ". " : "";
+        if (a.type === "sticky_note") out.push('<p class="mynote">' + xesc(where + "Note: " + stripHtml(a.text || "")) + "</p>");
+        else {
+          const q = (m ? coverText(m, a.positions) : "") || a._quote || "";
+          out.push('<blockquote><p>' + xesc(where) + (q ? "“" + xesc(q) + "”" : "(highlighted passage)") + "</p>" + (a.text ? '<p class="mynote">' + xesc(stripHtml(a.text)) + "</p>" : "") + "</blockquote>");
+        }
+      });
+    }
+  }
+  return xhtmlDoc(d.title || "Untitled", out.join("\n"));
+}
+async function buildEpub(docs, bookTitle, opts, onStatus){
+  const enc = new TextEncoder(); const files = [];
+  const add = (name, data) => files.push({ name: name, data: typeof data === "string" ? enc.encode(data) : data });
+  add("mimetype", "application/epub+zip");
+  add("META-INF/container.xml", '<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>\n</container>\n');
+  const annsByDoc = new Map();
+  if ((opts.notes || opts.marks) && tokenValid()){
+    onStatus("Fetching highlights and notes…");
+    try {
+      const list = docs.length === 1
+        ? await listAll("/annotations?document_id=" + encodeURIComponent(docs[0].id) + "&limit=200", MT.ann)
+        : await listAll("/annotations?limit=200", MT.ann);
+      list.forEach(a => { if (!annsByDoc.has(a.document_id)) annsByDoc.set(a.document_id, []); annsByDoc.get(a.document_id).push(a); });
+    } catch (e) {}
+  }
+  const chapters = [], images = []; let withText = 0, figCount = 0;
+  for (let i = 0; i < docs.length; i++){
+    const d = docs[i];
+    onStatus("Preparing paper " + (i + 1) + " of " + docs.length + "…");
+    const src = await exportSource(d, !!opts.figs, onStatus);
+    const m = src && src.m;
+    if (m) withText++;
+    let figs = [];
+    if (opts.figs && src && src.buf && m){ figs = await figurePages(src.buf, m, i + 1, onStatus, (name, data) => { add(name, data); images.push(name.replace("OEBPS/", "")); }); figCount += figs.length; }
+    let anns = annsByDoc.get(d.id);
+    if (!anns){ const cached = await DB.get("ann:" + d.id).catch(() => null); anns = (cached || []).filter(a => !String(a.id).startsWith("tmp-")); }
+    const file = "ch" + (i + 1) + ".xhtml";
+    add("OEBPS/" + file, chapterXhtml(d, m, anns, opts, figs));
+    chapters.push({ file: file, title: d.title || "Untitled" });
+  }
+  let fontOk = false;
+  if (opts.font){
+    onStatus("Adding the OpenDyslexic font…");
+    try {
+      const [r1, r2] = await Promise.all([fetch(OD_BASE + "OpenDyslexic-Regular.otf"), fetch(OD_BASE + "OpenDyslexic-Bold.otf")]);
+      if (r1.ok && r2.ok){
+        add("OEBPS/fonts/OpenDyslexic-Regular.otf", new Uint8Array(await r1.arrayBuffer()));
+        add("OEBPS/fonts/OpenDyslexic-Bold.otf", new Uint8Array(await r2.arrayBuffer()));
+        fontOk = true;
+      }
+    } catch (e) {}
+  }
+  const css = (fontOk ? '@font-face{font-family:"OpenDyslexic";font-weight:normal;font-style:normal;src:url(fonts/OpenDyslexic-Regular.otf);}\n@font-face{font-family:"OpenDyslexic";font-weight:bold;font-style:normal;src:url(fonts/OpenDyslexic-Bold.otf);}\nbody{font-family:"OpenDyslexic",serif;}\n' : "") +
+    "body{line-height:1.6;text-align:left;margin:0 0.4em;}\np{margin:0 0 0.9em 0;text-indent:0;text-align:left;}\nh1{font-size:1.35em;line-height:1.3;margin:0 0 0.6em 0;}\nh2{font-size:1.12em;line-height:1.3;margin:1.4em 0 0.6em 0;}\n.meta{margin:0 0 0.3em 0;font-size:0.9em;}\n.small{font-size:0.85em;}\n.note{font-style:italic;}\n.hl{text-decoration:underline;background-color:#e6e6e6;}\nblockquote{margin:0 0 0.9em 0;padding-left:0.8em;border-left:3px solid #888;}\n.mynote{font-style:italic;}\n.figpage{page-break-before:always;page-break-after:always;text-align:center;margin:0;}\n.figpage img{max-width:100%;max-height:95%;height:auto;}\n.caption{font-size:0.8em;text-align:center;margin:0.3em 0 0 0;}\nol{padding-left:1.2em;}\nli{margin-bottom:0.4em;}\n";
+  add("OEBPS/style.css", css);
+  const multi = docs.length > 1;
+  if (multi){
+    add("OEBPS/title.xhtml", xhtmlDoc(bookTitle, "<h1>" + xesc(bookTitle) + "</h1>\n<p class=\"meta\">" + docs.length + " papers. Made " + xesc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + ".</p>\n<ol>\n" + chapters.map(c => '<li><a href="' + c.file + '">' + xesc(c.title) + "</a></li>").join("\n") + "\n</ol>"));
+  }
+  const toc = (multi ? [{ file: "title.xhtml", title: "Contents" }] : []).concat(chapters);
+  add("OEBPS/nav.xhtml", '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en-GB" lang="en-GB">\n<head><meta charset="UTF-8"/><title>Contents</title></head>\n<body>\n<nav epub:type="toc" id="toc"><h1>Contents</h1>\n<ol>\n' + toc.map(c => '<li><a href="' + c.file + '">' + xesc(c.title) + "</a></li>").join("\n") + "\n</ol>\n</nav>\n</body>\n</html>\n");
+  const uid = "urn:uuid:" + (crypto.randomUUID ? crypto.randomUUID() : rand());
+  add("OEBPS/toc.ncx", '<?xml version="1.0" encoding="UTF-8"?>\n<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">\n<head><meta name="dtb:uid" content="' + uid + '"/><meta name="dtb:depth" content="1"/><meta name="dtb:totalPageCount" content="0"/><meta name="dtb:maxPageNumber" content="0"/></head>\n<docTitle><text>' + xesc(bookTitle) + "</text></docTitle>\n<navMap>\n" + toc.map((c, i) => '<navPoint id="np' + (i + 1) + '" playOrder="' + (i + 1) + '"><navLabel><text>' + xesc(c.title) + '</text></navLabel><content src="' + c.file + '"/></navPoint>').join("\n") + "\n</navMap>\n</ncx>\n");
+  const creator = !multi && docs[0].authors && docs[0].authors.length ? fullAuthors(docs[0].authors) : "Mendeley library";
+  const modified = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+  add("OEBPS/content.opf", '<?xml version="1.0" encoding="UTF-8"?>\n<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="en-GB">\n<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n<dc:identifier id="bookid">' + uid + "</dc:identifier>\n<dc:title>" + xesc(bookTitle) + "</dc:title>\n<dc:language>en-GB</dc:language>\n<dc:creator>" + xesc(creator) + '</dc:creator>\n<meta property="dcterms:modified">' + modified + "</meta>\n</metadata>\n<manifest>\n" +
+    '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>\n<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>\n<item id="css" href="style.css" media-type="text/css"/>\n' +
+    (fontOk ? '<item id="font1" href="fonts/OpenDyslexic-Regular.otf" media-type="application/vnd.ms-opentype"/>\n<item id="font2" href="fonts/OpenDyslexic-Bold.otf" media-type="application/vnd.ms-opentype"/>\n' : "") +
+    (multi ? '<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>\n' : "") +
+    images.map((h, k) => '<item id="img' + (k + 1) + '" href="' + h + '" media-type="image/jpeg"/>\n').join("") +
+    chapters.map((c, i) => '<item id="ch' + (i + 1) + '" href="' + c.file + '" media-type="application/xhtml+xml"/>').join("\n") +
+    '\n</manifest>\n<spine toc="ncx">\n' + (multi ? '<itemref idref="title"/>\n' : "") + chapters.map((c, i) => '<itemref idref="ch' + (i + 1) + '"/>').join("\n") + "\n</spine>\n</package>\n");
+  return { blob: makeZip(files), withText: withText, fontOk: fontOk, figCount: figCount };
+}
+function openEbook(docs, bookTitle){
+  sheetId = null; sheetMode = "ebook";
+  const marks = el("input", { type: "checkbox", checked: true });
+  const notes = el("input", { type: "checkbox", checked: true });
+  const font = el("input", { type: "checkbox", checked: true });
+  const figs = el("input", { type: "checkbox", checked: true });
+  const status = el("p", { class: "hint", "aria-live": "polite" });
+  const result = el("div", {});
+  const lab = (input, text) => el("label", { style: "display:flex;gap:10px;align-items:flex-start;padding:8px 0" }, input, el("span", { text: text }));
+  const prep = el("button", { class: "btn", text: "Make e-book" });
+  prep.addEventListener("click", async () => {
+    prep.disabled = true; result.replaceChildren();
+    try {
+      const r = await buildEpub(docs, bookTitle, { marks: marks.checked, notes: notes.checked, font: font.checked, figs: figs.checked }, t => status.textContent = t);
+      const name = (bookTitle || "papers").normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 60).toLowerCase() + ".epub";
+      const file = new File([r.blob], name, { type: "application/epub+zip" });
+      status.textContent = "Ready. " + (docs.length === 1 ? (r.withText ? "Full text included." : "Only the details could be included.") : r.withText + " of " + docs.length + " papers have full text.") + (figs.checked ? " " + r.figCount + " figure page" + (r.figCount === 1 ? "" : "s") + " added." : "") + (font.checked && !r.fontOk ? " The OpenDyslexic font couldn’t be downloaded, so the e-reader’s own font will be used." : "") + " (" + (file.size / 1048576).toFixed(1) + " MB)";
+      const canShare = navigator.canShare && navigator.canShare({ files: [file] });
+      setKids(result, el("div", { class: "actions" },
+        canShare ? el("button", { class: "btn", text: "Share…", onclick: () => navigator.share({ files: [file], title: bookTitle }).catch(() => {}) }) : null,
+        el("button", { class: canShare ? "btn line" : "btn", text: "Save file", onclick: () => {
+          const url = URL.createObjectURL(file); const a = document.createElement("a");
+          a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }})));
+    } catch (e) { status.textContent = "Couldn’t make the e-book: " + e.message; }
+    prep.disabled = false;
+  });
+  $("#sheetRight").replaceChildren();
+  setKids($("#sheetBody"),
+    el("h2", { text: "E-book for your e-reader" }),
+    el("p", { text: docs.length === 1 ? "Makes an EPUB of “" + (docs[0].title || "this paper") + "” using the reader’s cleaned-up text." : "Makes one EPUB of the " + docs.length + " papers in this list, with each paper as a chapter." }),
+    el("div", { class: "section" }, el("h3", { text: "Include" }),
+      lab(marks, "Underline my highlights in the text"),
+      lab(notes, "My highlights and notes at the end of each paper"),
+      lab(font, "The OpenDyslexic font"),
+      lab(figs, "Pages with figures and tables, as pictures where they fall in the text")),
+    docs.length > 10 ? el("p", { class: "hint", text: "Papers not opened before are downloaded and read now, so a long list can take a few minutes. Keep this screen open." }) : null,
+    el("div", { class: "actions" }, prep), status, result,
+    el("div", { class: "section" }, el("h3", { text: "Getting it onto your device" }),
+      el("p", { class: "hint", text: "Boox: save the file and open it from Downloads in the NeoReader app." }),
+      el("p", { class: "hint", text: "Kindle: add the file to Calibre on a computer, convert it to AZW3, then send it to the Kindle over USB. It stays on the device only. To see OpenDyslexic, choose Publisher Font in the Kindle’s Aa menu." })));
   $("#sheet").classList.add("open"); $("#sheet").scrollTop = 0;
 }
 
