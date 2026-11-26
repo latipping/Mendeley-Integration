@@ -200,7 +200,7 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 
 /* ================= Settings ================= */
 // Optional: paste your Mendeley app ID here to skip the setup screen.
-const BUILT_IN_CLIENT_ID = "";
+const BUILT_IN_CLIENT_ID = "27835";
 
 const API = "https://api.mendeley.com";
 const MT = {
@@ -1063,7 +1063,7 @@ function buildSettings(){
       opt("Cream", RS.theme === "cream", () => RS.theme = "cream"),
       opt("White", RS.theme === "white", () => RS.theme = "white"),
       opt("Dark", RS.theme === "dark", () => RS.theme = "dark")),
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 6" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 7" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
