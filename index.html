@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E9EDF1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11161C" media="(prefers-color-scheme: dark)">
+<title>Papers for Mendeley</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#F8FAFB; --ink:#18202B; --muted:#5B6676; --line:#CCD4DD;
+  --accent:#4338A8; --accent-ink:#FFFFFF; --accent-soft:#E3E0F7; --star:#B7791F; --danger:#B42318; --warn-bg:#FFF4D6; --warn-ink:#6B4A00;
+  --serif:"Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans:"Instrument Sans", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11161C; --surface:#1A2129; --ink:#E6EBF0; --muted:#95A1AF; --line:#2C3640;
+    --accent:#A39BF4; --accent-ink:#11161C; --accent-soft:#2A2747; --star:#E0B04A; --danger:#F97066; --warn-bg:#3A2F12; --warn-ink:#F5D58A;
+    color-scheme:dark;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 48px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:14px 0 10px}
+.top-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{font-family:var(--serif);font-weight:600;font-size:2.1rem;line-height:1;margin:0;letter-spacing:-.01em}
+.status{font-size:.86rem;color:var(--muted);margin-top:5px;min-height:1.2em}
+.status button{border:0;background:none;color:var(--accent);padding:0;font-size:inherit;text-decoration:underline}
+.btn{border:0;border-radius:999px;padding:10px 16px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:.95rem;white-space:nowrap}
+.btn.line{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.quiet{background:transparent;color:var(--accent);padding:8px 10px}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--line)}
+.btn.danger.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn.small{padding:7px 12px;font-size:.86rem}
+.btn:disabled{opacity:.5;cursor:default}
+.icon{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:1.2rem;line-height:1}
+.search{margin-top:12px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 14px;font-size:16px}
+.filters{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.filters::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;font-size:.88rem;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.selects{display:flex;gap:8px;margin-top:8px}
+.selects select{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 10px;font-size:.88rem;color:var(--muted)}
+.banner{background:var(--warn-bg);color:var(--warn-ink);border-radius:12px;padding:10px 14px;margin:10px 0 0;font-size:.9rem;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.list{list-style:none;margin:8px 0 0;padding:0}
+.row{display:grid;grid-template-columns:3.6rem 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line);cursor:pointer}
+.row:first-child{border-top:0}
+.year{font-family:var(--serif);font-size:1.45rem;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums oldstyle-nums;padding-top:2px}
+.year.nd{font-size:.95rem;color:var(--muted);padding-top:6px}
+.title{font-family:var(--serif);font-size:1.07rem;line-height:1.3;font-weight:600;margin:0}
+.row.unread .title::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:.12em}
+.authors{font-size:.9rem;margin-top:3px}
+.venue{font-family:var(--serif);font-style:italic;font-size:.9rem;color:var(--muted)}
+.marks{display:flex;gap:10px;margin-top:5px;font-size:.8rem;color:var(--muted);align-items:center}
+.marks .star{color:var(--star)}
+.marks .pdf{border:1px solid var(--line);border-radius:4px;padding:0 5px;font-weight:600;font-size:.72rem}
+.marks .pending{color:var(--accent)}
+.more{display:block;margin:16px auto}
+.panel{padding:28px 2px;max-width:36rem}
+.panel h2{font-family:var(--serif);font-size:1.5rem;margin:0 0 10px;line-height:1.2}
+.panel ol{padding-left:1.2rem;color:var(--muted)}
+.panel li{margin-bottom:8px}
+.panel code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.85rem;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 6px;word-break:break-all}
+.field{display:block;margin:14px 0}
+.field span{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:16px}
+.sheet{position:fixed;inset:0;z-index:20;background:var(--surface);overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet.open{display:block;animation:rise .22s ease-out}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+.sheet-bar{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--surface);border-bottom:1px solid var(--line);z-index:2}
+.sheet-body{max-width:640px;margin:0 auto;padding:18px 18px 48px}
+.sheet h2{font-family:var(--serif);font-size:1.5rem;line-height:1.2;margin:4px 0 10px;font-weight:600}
+.meta{font-size:.95rem;margin:0 0 4px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.section{margin-top:24px}
+.section h3{font-size:.85rem;font-weight:600;color:var(--muted);margin:0 0 8px}
+.abstract{font-family:var(--serif);font-size:1rem;line-height:1.6;margin:0;max-width:36em}
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);border-radius:6px;padding:3px 4px 3px 8px;font-size:.85rem}
+.tag button{border:0;background:none;color:var(--muted);font-size:1rem;line-height:1;padding:0 4px}
+.tag-in{border:1px dashed var(--line);background:transparent;border-radius:6px;padding:4px 8px;font-size:16px;width:9rem}
+.folders label{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.folders label:first-child{border-top:0}
+.folders input{width:20px;height:20px;accent-color:var(--accent)}
+textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px 12px;font-size:16px;line-height:1.5;resize:vertical}
+.hint{font-size:.82rem;color:var(--muted);margin:6px 0 0}
+.doi{word-break:break-all}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:.9rem;z-index:50;max-width:calc(100% - 32px);display:none}
+.toast.show{display:block}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion: reduce){.sheet.open{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<input type="file" id="pdfIn" accept="application/pdf,.pdf" class="sr" aria-hidden="true" tabindex="-1">
+<input type="file" id="newPdfIn" accept="application/pdf,.pdf" class="sr" aria-hidden="true" tabindex="-1">
+<section class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-bar"><button class="btn quiet" id="sheetClose">Library</button><div id="sheetRight"></div></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= Settings ================= */
+// Optional: paste your Mendeley app ID here to skip the setup screen.
+const BUILT_IN_CLIENT_ID = "";
+
+const API = "https://api.mendeley.com";
+const MT = {
+  doc: "application/vnd.mendeley-document.1+json",
+  folder: "application/vnd.mendeley-folder.1+json",
+  ann: "application/vnd.mendeley-annotation.1+json",
+  file: "application/vnd.mendeley-file.1+json"
+};
+const K = { cfg: "mfe-config", tok: "mfe-token", meta: "mfe-meta", out: "mfe-outbox", view: "mfe-view" };
+
+/* ================= Helpers ================= */
+const $ = (s, r) => (r || document).querySelector(s);
+function el(tag, attrs, ...kids){
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})){
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids){ if (c === null || c === undefined || c === false) continue; n.append(c.nodeType ? c : document.createTextNode(String(c))); }
+  return n;
+}
+function lsGet(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+let toastTimer;
+function toast(msg, ms){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms || 3500); }
+function norm(s){ return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+function rand(){ const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2, "0")).join(""); }
+function stripHtml(s){ const d = document.createElement("div"); d.innerHTML = (s || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n"); return (d.textContent || "").trim(); }
+function ago(t){
+  if (!t) return "never";
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago";
+  return new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+function asciiName(n){ return (n || "file.pdf").normalize("NFD").replace(/[^\x20-\x7E]/g, "").replace(/["\\]/g, "") || "file.pdf"; }
+
+/* ================= Local cache (IndexedDB) ================= */
+const DB = {
+  db: null,
+  open(){
+    return new Promise((res, rej) => {
+      let r; try { r = indexedDB.open("mendeley-front", 1); } catch (e) { return rej(e); }
+      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore("docs", { keyPath: "id" }); d.createObjectStore("kv"); };
+      r.onsuccess = () => { this.db = r.result; res(); }; r.onerror = () => rej(r.error);
+    });
+  },
+  tx(store, mode, fn){
+    return new Promise((res, rej) => {
+      if (!this.db) return res(undefined);
+      const t = this.db.transaction(store, mode); let out; const req = fn(t.objectStore(store));
+      if (req) req.onsuccess = () => { out = req.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  all(){ return this.tx("docs", "readonly", s => s.getAll()); },
+  put(d){ return this.tx("docs", "readwrite", s => s.put(d)); },
+  del(id){ return this.tx("docs", "readwrite", s => s.delete(id)); },
+  replaceAll(arr){ return this.tx("docs", "readwrite", s => { s.clear(); arr.forEach(d => s.put(d)); }); },
+  get(k){ return this.tx("kv", "readonly", s => s.get(k)); },
+  set(k, v){ return this.tx("kv", "readwrite", s => s.put(v, k)); },
+  clear(){ return Promise.all([this.tx("docs", "readwrite", s => s.clear()), this.tx("kv", "readwrite", s => s.clear())]); }
+};
+
+/* ================= State ================= */
+const S = {
+  cfg: lsGet(K.cfg, {}),
+  tok: lsGet(K.tok, null),
+  meta: lsGet(K.meta, {}),
+  outbox: lsGet(K.out, []),
+  lib: new Map(),
+  folders: [],
+  members: {},          // folderId -> [docIds]
+  files: {},            // docId -> [file]
+  view: Object.assign({ q: "", f: "all", folder: "", tag: "", sort: "modified", shown: 150 }, lsGet(K.view, {})),
+  syncing: false, lastError: "", authNeeded: false
+};
+S.view.q = ""; S.view.shown = 150;
+const clientId = () => BUILT_IN_CLIENT_ID || S.cfg.clientId || "";
+const redirectUri = () => location.origin + location.pathname;
+const tokenValid = () => S.tok && S.tok.token && S.tok.exp > Date.now() + 30000;
+function saveMeta(){ lsSet(K.meta, S.meta); }
+function saveOutbox(){ lsSet(K.out, S.outbox); }
+function saveView(){ lsSet(K.view, { f: S.view.f, folder: S.view.folder, tag: S.view.tag, sort: S.view.sort }); }
+
+/* ================= OAuth (implicit flow) ================= */
+function signIn(){
+  if (!clientId()) return render();
+  const st = rand();
+  try { sessionStorage.setItem("mfe-state", st); } catch (e) {}
+  const q = new URLSearchParams({ client_id: clientId(), redirect_uri: redirectUri(), response_type: "token", scope: "all", state: st });
+  location.href = API + "/oauth/authorize?" + q.toString();
+}
+function handleRedirect(){
+  const h = location.hash.startsWith("#") ? new URLSearchParams(location.hash.slice(1)) : null;
+  const q = new URLSearchParams(location.search);
+  let expected = null; try { expected = sessionStorage.getItem("mfe-state"); } catch (e) {}
+  if (h && h.get("access_token")){
+    if (expected && h.get("state") !== expected){ S.lastError = "Sign-in reply didn’t match this browser. Try signing in again."; }
+    else {
+      S.tok = { token: h.get("access_token"), exp: Date.now() + (Number(h.get("expires_in")) || 3600) * 1000 };
+      lsSet(K.tok, S.tok); S.meta.everSignedIn = true; saveMeta();
+    }
+    try { sessionStorage.removeItem("mfe-state"); sessionStorage.removeItem("mfe-auto"); } catch (e) {}
+    history.replaceState(null, "", location.pathname);
+  } else if (q.get("error") || (h && h.get("error"))){
+    const err = q.get("error_description") || q.get("error") || (h && (h.get("error_description") || h.get("error")));
+    S.lastError = "Mendeley refused sign-in: " + err + ". Check that the redirect URL registered for your app is exactly " + redirectUri();
+    history.replaceState(null, "", location.pathname);
+  }
+}
+function signOut(){
+  S.tok = null; localStorage.removeItem(K.tok); localStorage.removeItem(K.meta); localStorage.removeItem(K.out);
+  S.meta = {}; S.outbox = []; S.lib = new Map(); S.folders = []; S.members = {};
+  DB.clear().catch(() => {}); closeSheet(); render();
+}
+
+/* ================= API ================= */
+class ApiError extends Error { constructor(code, msg, status){ super(msg); this.code = code; this.status = status; } }
+async function api(method, path, opts){
+  opts = opts || {};
+  if (!tokenValid()){ S.authNeeded = true; throw new ApiError("auth", "Signed out"); }
+  const url = (path.startsWith("http") ? path : API + path);
+  const full = url + (url.includes("?") ? "&" : "?") + "access_token=" + encodeURIComponent(S.tok.token);
+  const headers = Object.assign({}, opts.headers || {});
+  if (opts.accept) headers["Accept"] = opts.accept;
+  if (opts.type) headers["Content-Type"] = opts.type;
+  let res;
+  try { res = await fetch(full, { method: method, headers: headers, body: opts.body }); }
+  catch (e) { throw new ApiError("network", "Couldn’t reach Mendeley. Check your connection."); }
+  if (res.status === 401){ S.tok = null; localStorage.removeItem(K.tok); S.authNeeded = true; throw new ApiError("auth", "Your Mendeley session ended."); }
+  if (!res.ok){
+    let t = ""; try { t = await res.text(); } catch (e) {}
+    let m = t; try { const j = JSON.parse(t); m = j.message || j.error || t; } catch (e) {}
+    throw new ApiError(res.status === 429 || res.status >= 500 ? "retry" : "http", m || ("Mendeley replied " + res.status), res.status);
+  }
+  if (opts.raw) return res;
+  if (res.status === 204) return null;
+  const txt = await res.text(); return txt ? JSON.parse(txt) : null;
+}
+function nextLink(res){
+  const l = res.headers.get("Link"); if (!l) return null;
+  const m = /<([^>]+)>\s*;\s*rel="?next"?/.exec(l); if (!m) return null;
+  return m[1].replace(/([?&])access_token=[^&]*&?/, "$1").replace(/[?&]$/, "");
+}
+async function listAll(path, accept, onPage){
+  let out = [], url = path, guard = 0;
+  while (url && guard++ < 400){
+    const res = await api("GET", url, { accept: accept, raw: true });
+    const page = await res.json();
+    out = out.concat(page);
+    if (onPage) onPage(out.length);
+    url = nextLink(res);
+  }
+  return out;
+}
+
+/* ================= Outbox (changes waiting to reach Mendeley) ================= */
+function queue(op){
+  if (op.t === "patch"){
+    const last = S.outbox[S.outbox.length - 1];
+    if (last && last.t === "patch" && last.id === op.id){ Object.assign(last.data, op.data); saveOutbox(); return kick(); }
+  }
+  S.outbox.push(op); saveOutbox(); kick();
+}
+let flushTimer;
+function kick(){ clearTimeout(flushTimer); flushTimer = setTimeout(() => flush().then(render), 600); render(); }
+let flushing = false;
+async function flush(){
+  if (flushing || !S.outbox.length || !tokenValid() || !navigator.onLine) return;
+  flushing = true;
+  try {
+    while (S.outbox.length){
+      const op = S.outbox[0];
+      try {
+        if (op.t === "patch"){
+          const d = await api("PATCH", "/documents/" + op.id, { type: MT.doc, accept: MT.doc, body: JSON.stringify(op.data) });
+          if (d && d.id){ const cur = S.lib.get(d.id); const merged = Object.assign({}, cur || {}, d); S.lib.set(d.id, merged); DB.put(merged); }
+        } else if (op.t === "fadd"){
+          await api("POST", "/folders/" + op.f + "/documents", { type: MT.doc, body: JSON.stringify({ id: op.id }) });
+        } else if (op.t === "fdel"){
+          await api("DELETE", "/folders/" + op.f + "/documents/" + op.id);
+        } else if (op.t === "trash"){
+          await api("POST", "/documents/" + op.id + "/trash");
+        }
+        S.outbox.shift(); saveOutbox();
+      } catch (e) {
+        if (e.code === "auth" || e.code === "network" || e.code === "retry") break;
+        if (e.status === 404 && op.t !== "patch"){ S.outbox.shift(); saveOutbox(); continue; }
+        toast("Mendeley rejected a change: " + e.message, 6000);
+        S.outbox.shift(); saveOutbox();
+      }
+    }
+  } finally { flushing = false; }
+}
+function pendingFor(id){ return S.outbox.filter(o => o.id === id); }
+function overlayPending(doc){
+  let d = doc;
+  pendingFor(doc.id).forEach(o => { if (o.t === "patch") d = Object.assign({}, d, o.data); });
+  return d;
+}
+
+/* ================= Sync ================= */
+async function sync(opts){
+  opts = opts || {};
+  if (S.syncing || !tokenValid()) { render(); return; }
+  if (!navigator.onLine){ S.lastError = "Offline. Changes will sync when you’re back online."; render(); return; }
+  S.syncing = true; S.lastError = ""; render();
+  try {
+    await flush();
+    const startIso = new Date(Date.now() - 5 * 60000).toISOString();
+    const full = opts.full || !S.meta.lastModified || Date.now() - (S.meta.lastFullAt || 0) > 24 * 3600000;
+    if (full){
+      const docs = await listAll("/documents?view=all&limit=500", MT.doc, n => setStatus("Downloading library… " + n));
+      const m = new Map(); docs.forEach(d => m.set(d.id, overlayPending(d)));
+      S.outbox.forEach(o => { if (o.t === "trash") m.delete(o.id); });
+      S.lib = m; await DB.replaceAll(Array.from(m.values()));
+      S.meta.lastFullAt = Date.now();
+    } else {
+      const since = encodeURIComponent(S.meta.lastModified);
+      const changed = await listAll("/documents?view=all&limit=500&modified_since=" + since, MT.doc);
+      for (const d of changed){ const o = overlayPending(d); S.lib.set(d.id, o); DB.put(o); }
+      try {
+        const gone = await listAll("/documents?limit=500&deleted_since=" + encodeURIComponent(S.meta.lastDeleted || S.meta.lastModified), MT.doc);
+        for (const d of gone){ S.lib.delete(d.id); DB.del(d.id); }
+      } catch (e) { if (e.code === "auth" || e.code === "network") throw e; }
+    }
+    let maxMod = S.meta.lastModified || "";
+    S.lib.forEach(d => { if (d.last_modified && d.last_modified > maxMod) maxMod = d.last_modified; });
+    S.meta.lastModified = maxMod || startIso; S.meta.lastDeleted = startIso; S.meta.lastSyncAt = Date.now(); saveMeta();
+    await syncFolders();
+    S.files = {};
+  } catch (e) {
+    S.lastError = e.code === "auth" ? "" : e.message;
+  } finally {
+    S.syncing = false; render(); if (sheetId) fillSheet();
+  }
+}
+async function syncFolders(){
+  const folders = await listAll("/folders?limit=500", MT.folder);
+  S.folders = folders.sort((a, b) => (a.name || "").localeCompare(b.name || "", "en-GB", { sensitivity: "base" }));
+  const members = {};
+  let i = 0;
+  async function worker(){
+    while (i < S.folders.length){
+      const f = S.folders[i++];
+      try { const ds = await listAll("/folders/" + f.id + "/documents?limit=500", MT.doc); members[f.id] = ds.map(d => d.id); }
+      catch (e) { if (e.code === "auth") throw e; members[f.id] = S.members[f.id] || []; }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  S.outbox.forEach(o => {
+    if (o.t === "fadd"){ members[o.f] = members[o.f] || []; if (!members[o.f].includes(o.id)) members[o.f].push(o.id); }
+    if (o.t === "fdel" && members[o.f]) members[o.f] = members[o.f].filter(x => x !== o.id);
+  });
+  S.members = members;
+  DB.set("folders", S.folders); DB.set("members", S.members);
+}
+
+/* ================= Local edits ================= */
+function edit(id, data){
+  const d = S.lib.get(id); if (!d) return;
+  const n = Object.assign({}, d, data); S.lib.set(id, n); DB.put(n);
+  queue({ t: "patch", id: id, data: data });
+  if (sheetId === id) fillSheet();
+}
+function setFolder(fid, id, on){
+  const arr = S.members[fid] || (S.members[fid] = []);
+  if (on && !arr.includes(id)) arr.push(id);
+  if (!on) S.members[fid] = arr.filter(x => x !== id);
+  DB.set("members", S.members);
+  queue({ t: on ? "fadd" : "fdel", f: fid, id: id });
+}
+function trash(id){
+  S.lib.delete(id); DB.del(id);
+  S.outbox = S.outbox.filter(o => !(o.t === "patch" && o.id === id)); saveOutbox();
+  queue({ t: "trash", id: id });
+}
+
+/* ================= Creating papers (needs a connection) ================= */
+const DOC_FIELDS = ["title", "type", "authors", "editors", "year", "month", "day", "source", "volume", "issue", "pages", "identifiers", "abstract", "keywords", "publisher", "city", "edition", "institution", "series", "chapter", "websites", "language"];
+async function addByDoi(raw){
+  const doi = (raw || "").trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").replace(/^doi:\s*/i, "");
+  if (!/^10\.\S+\/\S+/.test(doi)){ toast("That doesn’t look like a DOI. It should start with 10."); return false; }
+  toast("Looking up " + doi + "…", 20000);
+  let cat = [];
+  try { cat = await api("GET", "/catalog?view=bib&doi=" + encodeURIComponent(doi), { accept: MT.doc }); }
+  catch (e) { if (e.status !== 404){ toast(e.message, 6000); return false; } }
+  const src = (cat && cat[0]) || null;
+  if (!src){ toast("Mendeley’s catalogue has no record of that DOI.", 6000); return false; }
+  const body = {}; DOC_FIELDS.forEach(k => { if (src[k] !== undefined && src[k] !== null && src[k] !== "") body[k] = src[k]; });
+  body.type = body.type || "journal"; body.title = body.title || doi;
+  body.identifiers = Object.assign({}, body.identifiers || {}, { doi: doi });
+  try {
+    const d = await api("POST", "/documents", { type: MT.doc, accept: MT.doc, body: JSON.stringify(body) });
+    S.lib.set(d.id, d); DB.put(d);
+    if (S.view.folder) setFolder(S.view.folder, d.id, true);
+    toast("Added to Mendeley."); render(); return d.id;
+  } catch (e) { toast(e.message, 6000); return false; }
+}
+async function addFromPdf(file){
+  toast("Uploading " + file.name + "… Mendeley reads the details from the PDF.", 60000);
+  try {
+    const d = await api("POST", "/documents", { accept: MT.doc, type: "application/pdf", headers: { "Content-Disposition": 'attachment; filename="' + asciiName(file.name) + '"' }, body: file });
+    const full = await api("GET", "/documents/" + d.id + "?view=all", { accept: MT.doc }).catch(() => d);
+    S.lib.set(full.id, full); DB.put(full);
+    if (S.view.folder) setFolder(S.view.folder, full.id, true);
+    toast("Added to Mendeley. Check the details, as automatic extraction isn’t always right.", 6000);
+    render(); openSheet(full.id);
+  } catch (e) { toast(e.message, 6000); }
+}
+async function attachPdf(id, file){
+  toast("Uploading PDF…", 60000);
+  try {
+    const f = await api("POST", "/files", { accept: MT.file, type: "application/pdf", headers: { "Content-Disposition": 'attachment; filename="' + asciiName(file.name) + '"', "Link": "<" + API + "/documents/" + id + '>; rel="document"' }, body: file });
+    S.files[id] = (S.files[id] || []).concat(f ? [f] : []);
+    const d = S.lib.get(id); if (d){ const n = Object.assign({}, d, { file_attached: true }); S.lib.set(id, n); DB.put(n); }
+    toast("PDF attached in Mendeley."); render(); if (sheetId === id) fillSheet();
+  } catch (e) { toast(e.message, 6000); }
+}
+async function filesFor(id){
+  if (S.files[id]) return S.files[id];
+  const fs = await api("GET", "/files?document_id=" + encodeURIComponent(id), { accept: MT.file });
+  S.files[id] = fs || []; return S.files[id];
+}
+async function openPdf(id, win){
+  try {
+    const fs = await filesFor(id);
+    const f = fs.find(x => /pdf/i.test(x.mime_type || "") || /\.pdf$/i.test(x.file_name || "")) || fs[0];
+    if (!f){ if (win) win.close(); toast("Mendeley has no file for this paper."); return; }
+    if (!tokenValid()) throw new ApiError("auth", "Signed out");
+    const url = API + "/files/" + f.id + "?access_token=" + encodeURIComponent(S.tok.token);
+    if (win) win.location.href = url; else location.href = url;
+    const d = S.lib.get(id); if (d && !d.read) edit(id, { read: true });
+  } catch (e) {
+    if (win) win.close();
+    toast(e.code === "auth" ? "Sign in again to open PDFs." : e.message, 5000); render();
+  }
+}
+
+/* ================= Notes (Mendeley annotations) ================= */
+const notes = {};
+async function loadNote(id){
+  if (notes[id]) return notes[id];
+  const anns = await api("GET", "/annotations?document_id=" + encodeURIComponent(id) + "&limit=200", { accept: MT.ann });
+  const n = (anns || []).find(a => a.type === "note");
+  notes[id] = n ? { annId: n.id, text: stripHtml(n.text) } : { annId: null, text: "" };
+  return notes[id];
+}
+async function saveNote(id, text){
+  const cur = notes[id] || {};
+  if (cur.annId){
+    await api("PATCH", "/annotations/" + cur.annId, { type: MT.ann, accept: MT.ann, body: JSON.stringify({ text: text }) });
+  } else {
+    const a = await api("POST", "/annotations", { type: MT.ann, accept: MT.ann, body: JSON.stringify({ type: "note", document_id: id, text: text }) });
+    cur.annId = a && a.id;
+  }
+  notes[id] = { annId: cur.annId, text: text };
+}
+
+/* ================= Rendering: shell ================= */
+function setStatus(t){ const s = $("#statusLine"); if (s) s.textContent = t; }
+function statusText(){
+  if (S.syncing) return "Syncing with Mendeley…";
+  const bits = ["Synced " + ago(S.meta.lastSyncAt)];
+  if (S.outbox.length) bits.push(S.outbox.length + " change" + (S.outbox.length === 1 ? "" : "s") + " waiting");
+  return bits.join(", ");
+}
+function render(){
+  const app = $("#app");
+  if (!clientId()) return renderSetup(app);
+  if (!S.meta.everSignedIn && !tokenValid()) return renderSignIn(app);
+  renderLibrary(app);
+}
+function renderSetup(app){
+  const input = el("input", { type: "text", inputmode: "numeric", autocomplete: "off", placeholder: "e.g. 12345" });
+  app.replaceChildren(el("div", { class: "panel" },
+    el("h1", { text: "Papers" }),
+    el("p", { text: "A phone-friendly front end for your Mendeley library. Changes made here go straight to Mendeley, and changes made in Mendeley show up here." }),
+    el("h2", { text: "One-time setup" }),
+    el("ol", {},
+      el("li", {}, "Open the Mendeley developer portal at ", el("a", { href: "https://dev.mendeley.com/myapps.html", target: "_blank", rel: "noopener", text: "dev.mendeley.com" }), " and sign in with your Mendeley account."),
+      el("li", {}, "Register a new app. Any name works. Set the redirect URL to exactly ", el("span", { class: "mono", text: redirectUri() }), " ",
+        el("button", { class: "btn quiet small", text: "Copy", onclick: async () => { try { await navigator.clipboard.writeText(redirectUri()); toast("Copied."); } catch (e) { toast("Select and copy it by hand."); } } })),
+      el("li", { text: "Copy the app’s ID (the number shown in the list of your apps) and paste it below. You don’t need the secret." })
+    ),
+    el("label", { class: "field" }, el("span", { text: "Mendeley app ID" }), input),
+    el("button", { class: "btn", text: "Save and sign in", onclick: () => {
+      const v = input.value.trim(); if (!v){ toast("Paste your app ID first."); return; }
+      S.cfg.clientId = v; lsSet(K.cfg, S.cfg); signIn();
+    }}),
+    S.lastError ? el("p", { class: "banner", text: S.lastError }) : null
+  ));
+}
+function renderSignIn(app){
+  app.replaceChildren(el("div", { class: "panel" },
+    el("h1", { text: "Papers" }),
+    el("p", { text: "Sign in with Mendeley to load your library." }),
+    el("button", { class: "btn", text: "Sign in with Mendeley", onclick: signIn }),
+    S.lastError ? el("p", { class: "banner", text: S.lastError }) : null,
+    el("p", { class: "hint" }, el("button", { class: "btn quiet small", text: "Change app ID", onclick: () => { S.cfg = {}; lsSet(K.cfg, S.cfg); render(); } }))
+  ));
+}
+
+/* ================= Rendering: library ================= */
+let built = false;
+function buildLibraryShell(app){
+  const v = S.view;
+  const search = el("input", { class: "search", id: "search", type: "search", placeholder: "Search titles, authors, abstracts, tags", "aria-label": "Search library", autocomplete: "off" });
+  let st; search.addEventListener("input", () => { clearTimeout(st); st = setTimeout(() => { v.q = search.value; v.shown = 150; drawList(); }, 120); });
+  const chips = [["all", "All"], ["unread", "Unread"], ["starred", "Starred"], ["pdf", "With PDF"], ["recent", "Added this month"]].map(([k, t]) =>
+    el("button", { class: "chip", "data-f": k, "aria-pressed": String(v.f === k), text: t, onclick: e => {
+      v.f = k; v.shown = 150; saveView(); document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === e.currentTarget))); drawList();
+    }}));
+  const sortSel = el("select", { id: "sortSel", "aria-label": "Sort", onchange: e => { v.sort = e.target.value; saveView(); drawList(); } },
+    ...[["modified", "Recently changed"], ["added", "Recently added"], ["year", "Newest first"], ["title", "Title A–Z"], ["author", "First author A–Z"]].map(([k, t]) => el("option", { value: k, text: t })));
+  sortSel.value = v.sort;
+  app.replaceChildren(
+    el("header", { class: "top" },
+      el("div", { class: "top-row" },
+        el("div", {}, el("h1", { text: "Papers" }), el("div", { class: "status", id: "statusLine" })),
+        el("div", { style: "display:flex;gap:8px" },
+          el("button", { class: "icon", "aria-label": "Sync now", title: "Sync now", text: "↻", onclick: () => sync() }),
+          el("button", { class: "btn", text: "Add", onclick: openAdd }))
+      ),
+      el("div", { id: "bannerBox" }),
+      search,
+      el("div", { class: "filters", role: "group", "aria-label": "Filter" }, ...chips),
+      el("div", { class: "selects" },
+        el("select", { id: "folderSel", "aria-label": "Folder", onchange: e => { v.folder = e.target.value; v.shown = 150; saveView(); drawList(); } }),
+        el("select", { id: "tagSel", "aria-label": "Tag", onchange: e => { v.tag = e.target.value; v.shown = 150; saveView(); drawList(); } }),
+        sortSel)
+    ),
+    el("ul", { class: "list", id: "list" }),
+    el("div", { id: "listFoot" }),
+    el("p", { class: "hint", style: "margin-top:28px" },
+      el("button", { class: "btn quiet small", text: "Full resync", onclick: () => sync({ full: true }) }),
+      el("button", { class: "btn quiet small", text: "Sign out", onclick: () => { if (S.outbox.length && !confirmSignOut()) return; signOut(); } }))
+  );
+  built = true;
+}
+let signOutArmed = 0;
+function confirmSignOut(){ if (Date.now() - signOutArmed < 4000) return true; signOutArmed = Date.now(); toast("Some changes haven’t reached Mendeley yet. Tap Sign out again to discard them."); return false; }
+function renderLibrary(app){
+  if (!built || !$("#list")) buildLibraryShell(app);
+  setStatus(statusText());
+  const bb = $("#bannerBox"); bb.replaceChildren();
+  if (!tokenValid()) bb.append(el("div", { class: "banner" }, el("span", { text: "Sign in again to sync with Mendeley." }), el("button", { class: "btn small", text: "Sign in", onclick: signIn })));
+  else if (S.lastError) bb.append(el("div", { class: "banner" }, el("span", { text: S.lastError })));
+  const fs = $("#folderSel"), curF = S.view.folder;
+  fs.replaceChildren(el("option", { value: "", text: "All folders" }), ...S.folders.map(f => el("option", { value: f.id, text: (f.parent_id ? "  " : "") + f.name + " (" + ((S.members[f.id] || []).filter(id => S.lib.has(id)).length) + ")" })));
+  fs.value = S.folders.some(f => f.id === curF) ? curF : ""; S.view.folder = fs.value;
+  const tags = new Map(); S.lib.forEach(d => (d.tags || []).forEach(t => tags.set(t, (tags.get(t) || 0) + 1)));
+  const ts = $("#tagSel"), curT = S.view.tag;
+  ts.replaceChildren(el("option", { value: "", text: "All tags" }), ...Array.from(tags.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 300).map(([t, c]) => el("option", { value: t, text: t + " (" + c + ")" })));
+  ts.value = tags.has(curT) ? curT : ""; S.view.tag = ts.value;
+  drawList();
+}
+function authorLine(a){
+  if (!a || !a.length) return "";
+  const L = a.map(x => x.last_name || x.first_name || "");
+  if (L.length === 1) return L[0]; if (L.length === 2) return L[0] + " & " + L[1];
+  if (L.length === 3) return L[0] + ", " + L[1] + " & " + L[2]; return L[0] + " et al.";
+}
+function fullAuthors(a){ return (a || []).map(x => [x.first_name, x.last_name].filter(Boolean).join(" ")).join(", "); }
+function venue(d){
+  let v = d.source || "";
+  if (d.volume) v += (v ? " " : "") + d.volume + (d.issue ? "(" + d.issue + ")" : "");
+  if (d.pages) v += (v ? ", " : "") + d.pages;
+  return v;
+}
+function visible(){
+  const v = S.view, words = norm(v.q) ? norm(v.q).split(" ") : [];
+  const inFolder = v.folder ? new Set(S.members[v.folder] || []) : null;
+  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const arr = Array.from(S.lib.values()).filter(d => {
+    if (v.f === "unread" && d.read) return false;
+    if (v.f === "starred" && !d.starred) return false;
+    if (v.f === "pdf" && !d.file_attached) return false;
+    if (v.f === "recent" && !(d.created > monthAgo)) return false;
+    if (inFolder && !inFolder.has(d.id)) return false;
+    if (v.tag && !(d.tags || []).includes(v.tag)) return false;
+    if (words.length){
+      const hay = norm([d.title, fullAuthors(d.authors), d.source, d.year, d.abstract, (d.tags || []).join(" "), (d.keywords || []).join(" "), d.identifiers && d.identifiers.doi].join(" "));
+      return words.every(w => hay.includes(w));
+    }
+    return true;
+  });
+  const by = {
+    modified: (a, b) => (b.last_modified || "").localeCompare(a.last_modified || ""),
+    added: (a, b) => (b.created || "").localeCompare(a.created || ""),
+    year: (a, b) => (b.year || 0) - (a.year || 0) || (a.title || "").localeCompare(b.title || ""),
+    title: (a, b) => (a.title || "").localeCompare(b.title || "", "en-GB", { sensitivity: "base" }),
+    author: (a, b) => ((a.authors && a.authors[0] && a.authors[0].last_name) || "~").localeCompare((b.authors && b.authors[0] && b.authors[0].last_name) || "~", "en-GB", { sensitivity: "base" })
+  };
+  return arr.sort(by[v.sort] || by.modified);
+}
+function drawList(){
+  const list = $("#list"); if (!list) return;
+  const items = visible(); const shown = items.slice(0, S.view.shown);
+  const pend = new Set(S.outbox.map(o => o.id));
+  list.replaceChildren(...shown.map(d => {
+    const marks = el("div", { class: "marks" },
+      d.starred ? el("span", { class: "star", text: "★" }) : null,
+      d.file_attached ? el("span", { class: "pdf", text: "PDF" }) : null,
+      pend.has(d.id) ? el("span", { class: "pending", text: "Syncing change" }) : null);
+    return el("li", { class: "row" + (d.read ? "" : " unread"), tabindex: "0", role: "button", "aria-label": d.title || "Untitled",
+      onclick: () => openSheet(d.id), onkeydown: e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); openSheet(d.id); } } },
+      d.year ? el("div", { class: "year", text: String(d.year) }) : el("div", { class: "year nd", text: "n.d." }),
+      el("div", {},
+        el("p", { class: "title", text: d.title || "Untitled" }),
+        authorLine(d.authors) ? el("div", { class: "authors", text: authorLine(d.authors) }) : null,
+        d.source ? el("div", { class: "venue", text: d.source }) : null,
+        marks.childNodes.length ? marks : null));
+  }));
+  const foot = $("#listFoot"); foot.replaceChildren();
+  if (items.length > shown.length) foot.append(el("button", { class: "btn line more", text: "Show more (" + (items.length - shown.length) + " left)", onclick: () => { S.view.shown += 300; drawList(); } }));
+  if (!items.length){
+    const msg = S.syncing && !S.lib.size ? "Loading your Mendeley library…" : S.lib.size ? "No papers match. Try a different search or filter." : "Your Mendeley library is empty. Tap Add to put a paper in it.";
+    foot.append(el("p", { class: "panel", text: msg }));
+  }
+}
+
+/* ================= Sheet: paper details ================= */
+let sheetId = null, sheetMode = null, delArmed = false;
+function openSheet(id){ sheetId = id; sheetMode = "doc"; delArmed = false; fillSheet(); const s = $("#sheet"); s.classList.add("open"); s.scrollTop = 0; }
+function closeSheet(){ sheetId = null; sheetMode = null; $("#sheet").classList.remove("open"); render(); }
+$("#sheetClose").addEventListener("click", closeSheet);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetMode) closeSheet(); });
+
+function fillSheet(){
+  if (sheetMode !== "doc") return;
+  const d = S.lib.get(sheetId); if (!d){ closeSheet(); return; }
+  const active = document.activeElement;
+  if (active && active.closest && active.closest("#sheetBody") && /INPUT|TEXTAREA/.test(active.tagName)) { refreshSheetBar(d); return; }
+  refreshSheetBar(d);
+  const body = $("#sheetBody"); body.replaceChildren();
+  const doi = d.identifiers && d.identifiers.doi;
+  const web = (d.websites || []).find(u => /^https:\/\//i.test(u));
+  body.append(...[
+    el("h2", { text: d.title || "Untitled" }),
+    d.authors && d.authors.length ? el("p", { class: "meta", text: fullAuthors(d.authors) }) : null,
+    (venue(d) || d.year) ? el("p", { class: "meta venue", text: [venue(d), d.year].filter(Boolean).join(", ") }) : null,
+    el("div", { class: "actions" },
+      d.file_attached
+        ? el("button", { class: "btn", text: "Open PDF", onclick: () => { const w = window.open("about:blank", "_blank"); openPdf(d.id, w); } })
+        : el("button", { class: "btn", text: "Attach PDF", onclick: () => $("#pdfIn").click() }),
+      el("button", { class: "btn line", text: d.read ? "Mark unread" : "Mark read", onclick: () => edit(d.id, { read: !d.read }) }),
+      el("button", { class: "btn line", text: "Edit details", onclick: () => openEdit(d.id) })
+    ),
+    doi ? el("div", { class: "section" }, el("h3", { text: "DOI" }), el("a", { class: "doi", href: "https://doi.org/" + encodeURI(doi), target: "_blank", rel: "noopener noreferrer", text: doi })) : null,
+    !doi && web ? el("div", { class: "section" }, el("h3", { text: "Link" }), el("a", { class: "doi", href: web, target: "_blank", rel: "noopener noreferrer", text: web })) : null,
+    d.abstract ? el("div", { class: "section" }, el("h3", { text: "Abstract" }), el("p", { class: "abstract", text: d.abstract })) : null,
+    tagSection(d),
+    folderSection(d),
+    noteSection(d),
+    el("div", { class: "section" }, deleteButton(d))
+  ].filter(Boolean));
+}
+function refreshSheetBar(d){
+  $("#sheetRight").replaceChildren(el("button", { class: "btn quiet", "aria-pressed": String(!!d.starred), text: d.starred ? "★ Starred" : "☆ Star", onclick: () => edit(d.id, { starred: !d.starred }) }));
+}
+function tagSection(d){
+  const input = el("input", { class: "tag-in", type: "text", placeholder: "Add tag", "aria-label": "Add tag", enterkeyhint: "done" });
+  const add = () => {
+    const t = input.value.trim(); if (!t) return;
+    const tags = Array.from(new Set([].concat(d.tags || [], [t])));
+    input.value = ""; input.blur(); edit(d.id, { tags: tags });
+  };
+  input.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); add(); } });
+  input.addEventListener("blur", () => { if (input.value.trim()) add(); });
+  return el("div", { class: "section" }, el("h3", { text: "Tags" }),
+    el("div", { class: "tags" },
+      ...(d.tags || []).map(t => el("span", { class: "tag" }, t, el("button", { "aria-label": "Remove tag " + t, text: "×", onclick: () => edit(d.id, { tags: (d.tags || []).filter(x => x !== t) }) }))),
+      input));
+}
+function folderSection(d){
+  if (!S.folders.length) return null;
+  return el("div", { class: "section" }, el("h3", { text: "Folders" }),
+    el("div", { class: "folders" }, ...S.folders.map(f => {
+      const cb = el("input", { type: "checkbox" }); cb.checked = (S.members[f.id] || []).includes(d.id);
+      cb.addEventListener("change", () => setFolder(f.id, d.id, cb.checked));
+      return el("label", {}, cb, el("span", { text: f.name }));
+    })));
+}
+function noteSection(d){
+  const ta = el("textarea", { "aria-label": "Notes", placeholder: "Loading note…", disabled: true });
+  const btn = el("button", { class: "btn line small", text: "Save note", disabled: true });
+  const hint = el("p", { class: "hint", text: "Saved as the paper’s note in Mendeley." });
+  loadNote(d.id).then(n => {
+    if (!ta.isConnected) return;
+    ta.value = n.text; ta.disabled = false; ta.placeholder = "Your notes on this paper"; btn.disabled = false;
+  }).catch(e => { ta.placeholder = e.code === "auth" ? "Sign in again to load notes." : "Couldn’t load the note: " + e.message; });
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; btn.textContent = "Saving…";
+    try { await saveNote(d.id, ta.value); btn.textContent = "Saved"; setTimeout(() => { if (btn.isConnected){ btn.textContent = "Save note"; btn.disabled = false; } }, 1500); }
+    catch (e) { toast(e.code === "auth" ? "Sign in again to save notes." : "Note not saved: " + e.message, 6000); btn.textContent = "Save note"; btn.disabled = false; }
+  });
+  return el("div", { class: "section" }, el("h3", { text: "Notes" }), ta, el("div", { class: "actions", style: "margin-top:8px" }, btn), hint);
+}
+function deleteButton(d){
+  const b = el("button", { class: "btn danger", text: "Move to Mendeley trash" });
+  b.addEventListener("click", () => {
+    if (!delArmed){ delArmed = true; b.classList.add("armed"); b.textContent = "Tap again to move to trash"; setTimeout(() => { delArmed = false; if (b.isConnected){ b.classList.remove("armed"); b.textContent = "Move to Mendeley trash"; } }, 4000); return; }
+    const id = d.id; closeSheet(); trash(id); toast("Moved to trash. You can restore it in Mendeley.");
+  });
+  return b;
+}
+$("#pdfIn").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f && sheetId) attachPdf(sheetId, f); });
+
+/* ================= Sheet: edit details ================= */
+function openEdit(id){
+  const d = S.lib.get(id); if (!d) return;
+  sheetMode = "edit";
+  const f = {
+    title: el("input", { type: "text" }), authors: el("textarea", { style: "min-height:90px" }), year: el("input", { type: "number", inputmode: "numeric" }),
+    source: el("input", { type: "text" }), volume: el("input", { type: "text" }), issue: el("input", { type: "text" }), pages: el("input", { type: "text" }), doi: el("input", { type: "text", autocapitalize: "off" })
+  };
+  f.title.value = d.title || ""; f.year.value = d.year || ""; f.source.value = d.source || ""; f.volume.value = d.volume || ""; f.issue.value = d.issue || ""; f.pages.value = d.pages || "";
+  f.doi.value = (d.identifiers && d.identifiers.doi) || "";
+  f.authors.value = (d.authors || []).map(a => [a.last_name, a.first_name].filter(Boolean).join(", ")).join("\n");
+  $("#sheetRight").replaceChildren(el("button", { class: "btn", text: "Save", onclick: () => {
+    const data = {};
+    const t = f.title.value.trim(); if (t && t !== d.title) data.title = t;
+    const y = parseInt(f.year.value, 10); if ((y || null) !== (d.year || null) && y) data.year = y;
+    ["source", "volume", "issue", "pages"].forEach(k => { const v = f[k].value.trim(); if (v !== (d[k] || "")) data[k] = v; });
+    const doi = f.doi.value.trim(); if (doi !== ((d.identifiers && d.identifiers.doi) || "")) data.identifiers = Object.assign({}, d.identifiers || {}, { doi: doi });
+    const authors = f.authors.value.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const [last, ...rest] = l.split(","); return { last_name: last.trim(), first_name: rest.join(",").trim() }; });
+    if (JSON.stringify(authors) !== JSON.stringify((d.authors || []).map(a => ({ last_name: a.last_name || "", first_name: a.first_name || "" })))) data.authors = authors;
+    if (Object.keys(data).length) edit(id, data);
+    sheetMode = "doc"; fillSheet();
+  }}));
+  const L = (label, input) => el("label", { class: "field" }, el("span", { text: label }), input);
+  $("#sheetBody").replaceChildren(el("h2", { text: "Edit details" }),
+    L("Title", f.title), L("Authors, one per line as Surname, First names", f.authors), L("Year", f.year), L("Journal or source", f.source),
+    el("div", { style: "display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px" }, L("Volume", f.volume), L("Issue", f.issue), L("Pages", f.pages)),
+    L("DOI", f.doi),
+    el("button", { class: "btn line", text: "Cancel", onclick: () => { sheetMode = "doc"; fillSheet(); } }));
+  $("#sheet").scrollTop = 0;
+}
+
+/* ================= Sheet: add paper ================= */
+function openAdd(){
+  if (!tokenValid()){ toast("Sign in again to add papers."); return; }
+  sheetId = null; sheetMode = "add";
+  const doiIn = el("input", { type: "text", autocapitalize: "off", autocorrect: "off", placeholder: "10.1038/nature14539", enterkeyhint: "go" });
+  const go = async () => { b.disabled = true; const id = await addByDoi(doiIn.value); b.disabled = false; if (id) openSheet(id); };
+  const b = el("button", { class: "btn", text: "Add by DOI", onclick: go });
+  doiIn.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); go(); } });
+  $("#sheetRight").replaceChildren();
+  const folderName = S.view.folder && (S.folders.find(f => f.id === S.view.folder) || {}).name;
+  $("#sheetBody").replaceChildren(...[el("h2", { text: "Add a paper" }),
+    folderName ? el("p", { class: "hint", text: "It will also go into the folder “" + folderName + "”." }) : null,
+    el("label", { class: "field" }, el("span", { text: "DOI or doi.org link" }), doiIn), b,
+    el("div", { class: "section" }, el("h3", { text: "Or from a PDF" }),
+      el("p", { class: "hint", text: "Mendeley reads the title, authors and journal from the file and keeps the PDF with the paper." }),
+      el("div", { class: "actions" }, el("button", { class: "btn line", text: "Choose PDF", onclick: () => $("#newPdfIn").click() })))].filter(Boolean));
+  $("#sheet").classList.add("open");
+  setTimeout(() => doiIn.focus(), 250);
+}
+$("#newPdfIn").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f){ closeSheet(); addFromPdf(f); } });
+
+/* ================= Start ================= */
+async function start(){
+  handleRedirect();
+  try { await DB.open(); } catch (e) {}
+  try {
+    const docs = await DB.all(); (docs || []).forEach(d => S.lib.set(d.id, d));
+    S.folders = (await DB.get("folders")) || []; S.members = (await DB.get("members")) || {};
+  } catch (e) {}
+  render();
+  if (!clientId()) return;
+  if (!tokenValid() && S.meta.everSignedIn && navigator.onLine){
+    let tried = false; try { tried = sessionStorage.getItem("mfe-auto") === "1"; sessionStorage.setItem("mfe-auto", "1"); } catch (e) { tried = true; }
+    if (!tried){ signIn(); return; }
+  }
+  if (tokenValid()) sync();
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && tokenValid() && Date.now() - (S.meta.lastSyncAt || 0) > 60000) sync(); });
+window.addEventListener("online", () => { if (tokenValid()) sync(); });
+setInterval(() => { if (document.visibilityState === "visible" && tokenValid()) sync(); }, 3 * 60000);
+setInterval(() => { if (built && !S.syncing) setStatus(statusText()); if (S.tok && !tokenValid() && built) { render(); } }, 30000);
+start();
+})();
+</script>
+</body>
+</html>
