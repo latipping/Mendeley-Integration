@@ -132,7 +132,7 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd-opt{border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);border-radius:999px;padding:6px 12px;font-size:.88rem}
 .rd-opt[aria-pressed="true"]{background:var(--rd-ink);color:var(--rd-bg);border-color:var(--rd-ink)}
 .rd-scroll{flex:1;overflow-y:auto}
-.rd-text{max-width:34em;margin:0 auto;padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 140px);font-size:var(--rd-size,19px);line-height:var(--rd-lh,1.7);text-align:left;-webkit-user-select:text;user-select:text;overflow-wrap:break-word}
+.rd-text{max-width:var(--rd-maxw,34em);margin:0 auto;padding:22px clamp(18px,3vw,40px) calc(env(safe-area-inset-bottom,0px) + 140px);font-size:var(--rd-size,19px);line-height:var(--rd-lh,1.7);text-align:left;-webkit-user-select:text;user-select:text;overflow-wrap:break-word}
 .rd[data-font="dyslexic"] .rd-text{font-family:"OpenDyslexic", var(--sans);letter-spacing:.01em;word-spacing:.12em}
 .rd[data-font="standard"] .rd-text{font-family:var(--sans)}
 .rd-text p{margin:0 0 1.1em}
@@ -1051,6 +1051,8 @@ function applyReaderSettings(){
   const rd = $("#rd");
   rd.dataset.theme = RS.theme; rd.dataset.font = RS.font;
   rd.style.setProperty("--rd-size", RS.size + "px"); rd.style.setProperty("--rd-lh", String(RS.spacing));
+  const w = RS.width || (window.innerWidth >= 700 ? "full" : "narrow");
+  rd.style.setProperty("--rd-maxw", w === "full" ? "none" : w === "wide" ? "48em" : "34em");
   lsSet("mfe-reader", RS);
 }
 function buildSettings(){
@@ -1068,6 +1070,11 @@ function buildSettings(){
       opt("Normal", RS.spacing === 1.5, () => RS.spacing = 1.5),
       opt("Wide", RS.spacing === 1.7, () => RS.spacing = 1.7),
       opt("Extra wide", RS.spacing === 2.1, () => RS.spacing = 2.1)),
+    (() => { const w = RS.width || (window.innerWidth >= 700 ? "full" : "narrow");
+      return el("div", { class: "grp" }, el("span", { class: "lab", text: "Text width" }),
+        opt("Narrow", w === "narrow", () => RS.width = "narrow"),
+        opt("Wide", w === "wide", () => RS.width = "wide"),
+        opt("Fit screen", w === "full", () => RS.width = "full")); })(),
     el("div", { class: "grp" }, el("span", { class: "lab", text: "Background" }),
       opt("Cream", RS.theme === "cream", () => RS.theme = "cream"),
       opt("White", RS.theme === "white", () => RS.theme = "white"),
@@ -1082,7 +1089,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 9" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 10" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
