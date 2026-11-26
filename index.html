@@ -114,7 +114,14 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd[data-theme="white"]{--rd-bg:#FFFFFF;--rd-ink:#1E1E1E;--rd-muted:#6B6B6B;--rd-line:#E2E2E2;--rd-bar:#F4F4F4;--rd-accent:#4338A8;--rd-hl-a:.75}
 .rd[data-theme="dark"]{--rd-bg:#16191D;--rd-ink:#E2E4E6;--rd-muted:#9AA3AD;--rd-line:#2C3238;--rd-bar:#1E2227;--rd-accent:#A39BF4;--rd-hl-a:.32}
 .rd-top{position:relative;z-index:5;flex:none;display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top,0px) + 6px) 6px 6px;background:var(--rd-bar);border-bottom:1px solid var(--rd-line)}
-.rd-tb{border:0;background:none;color:var(--rd-accent);font-weight:600;font-size:.95rem;padding:8px 10px;border-radius:8px;flex:none}
+.rd-tb{border:0;background:none;color:var(--rd-accent);font-weight:600;font-size:.92rem;padding:8px 7px;border-radius:8px;flex:none}
+.rd-player{flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 12px;background:var(--rd-bar);border-bottom:1px solid var(--rd-line)}
+.pl-b{width:44px;height:44px;border-radius:50%;border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);display:flex;align-items:center;justify-content:center;padding:0}
+.pl-b.main{width:52px;height:52px;background:var(--rd-accent);border-color:var(--rd-accent);color:var(--rd-bg)}
+.pl-rate{min-width:52px;height:36px;border-radius:999px;border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.pl-pos{font-size:.82rem;color:var(--rd-muted);min-width:2.6rem;text-align:right;font-variant-numeric:tabular-nums}
+::highlight(rd-speak){background-color:rgba(255,214,102,.55)}
+.rd-speaking{background:rgba(255,214,102,.25)}
 .rd-tb[aria-expanded="true"]{background:var(--rd-line)}
 .rd-title{flex:1;min-width:0;font-family:var(--serif);font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--rd-muted);text-align:center}
 .rd-prog{flex:none;height:3px;background:var(--rd-line)}
@@ -181,11 +188,13 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
   <div class="rd-top">
     <button class="rd-tb" id="rdClose">Done</button>
     <div class="rd-title" id="rdTitle"></div>
+    <button class="rd-tb" id="rdListenBtn" aria-pressed="false">Listen</button>
     <button class="rd-tb" id="rdTapBtn" aria-pressed="false">Highlight</button>
     <button class="rd-tb" id="rdNotesBtn" aria-pressed="false">Notes</button>
     <button class="rd-tb" id="rdSetBtn" aria-expanded="false" aria-label="Reading settings">Aa</button>
     <div class="rd-bar" id="rdBar" hidden></div>
   </div>
+  <div class="rd-player" id="rdPlayer" hidden></div>
   <div class="rd-prog"><div id="rdProg"></div></div>
   <div class="rd-set" id="rdSet" hidden></div>
   <div class="rd-scroll" id="rdScroll"><article class="rd-text" id="rdText"></article></div>
@@ -1047,7 +1056,7 @@ function applyReaderSettings(){
 function buildSettings(){
   const box = $("#rdSet");
   const opt = (label, on, fn) => el("button", { class: "rd-opt", "aria-pressed": String(on), text: label, onclick: () => { fn(); applyReaderSettings(); buildSettings(); } });
-  box.replaceChildren(
+  setKids(box, 
     el("div", { class: "grp" }, el("span", { class: "lab", text: "Font" }),
       opt("OpenDyslexic", RS.font === "dyslexic", () => RS.font = "dyslexic"),
       opt("Standard", RS.font === "standard", () => RS.font = "standard")),
@@ -1063,7 +1072,17 @@ function buildSettings(){
       opt("Cream", RS.theme === "cream", () => RS.theme = "cream"),
       opt("White", RS.theme === "white", () => RS.theme = "white"),
       opt("Dark", RS.theme === "dark", () => RS.theme = "dark")),
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 7" })
+    synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice" }), (() => {
+      const vs = ttsVoices(); const cur = pickVoice();
+      const sel = el("select", { class: "rd-opt", style: "flex:1;min-width:0;border-radius:10px", "aria-label": "Voice", onchange: e => { RS.voice = e.target.value; lsSet("mfe-reader", RS); if (TTS.playing) ttsSpeak(TTS.idx); } },
+        ...(vs.length ? vs.map(v => el("option", { value: v.voiceURI, text: v.name + " (" + v.lang.replace("_", "-") + ")" })) : [el("option", { value: "", text: "Default voice" })]));
+      if (cur) sel.value = cur.voiceURI;
+      return sel;
+    })()) : null,
+    synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
+      ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
+    synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them on your iPhone in Settings, Accessibility, Spoken Content, Voices, English. Look for ones marked Enhanced or Premium." }) : null,
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 8" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1206,7 +1225,7 @@ async function openReader(docId){
   R.title = d.title || "Paper"; $("#rdTitle").textContent = R.title; $("#rdTitle").classList.remove("hint");
   applyReaderSettings();
   $("#rdSet").hidden = true; $("#rdSetBtn").setAttribute("aria-expanded", "false");
-  hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
+  ttsReset(); hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rdText").replaceChildren(el("p", { class: "rd-msg", text: "Getting the PDF…" }));
   $("#rdProg").style.width = "0";
   $("#rd").classList.add("open"); document.body.style.overflow = "hidden";
@@ -1301,7 +1320,7 @@ $("#rdScroll").addEventListener("scroll", () => {
   posTimer = setTimeout(() => { if (!R.model) return; const all = lsGet("mfe-pos", {}); all[R.docId] = +f.toFixed(4); lsSet("mfe-pos", all); }, 400);
 }, { passive: true });
 function closeReader(){
-  R.gen++; hidePanel(); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
+  ttsReset(); R.gen++; hidePanel(); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rd").classList.remove("open"); document.body.style.overflow = "";
   $("#rdText").replaceChildren(); R.model = null; R.spanEls = [];
 }
@@ -1625,6 +1644,7 @@ function openAnnPanel(id, focusNote){
 }
 $("#rdText").addEventListener("click", e => {
   if (R.tapMode) handleTap(e);
+  else if (TTS.on) jumpToTap(e);
 });
 $("#rdNotesBtn").addEventListener("click", () => {
   if (!$("#rdPanel").hidden){ hidePanel(); return; }
@@ -1675,6 +1695,170 @@ function showNotesList(){
   );
   $("#rdPanel").hidden = false;
 }
+
+/* ================= Read aloud ================= */
+const synth = window.speechSynthesis || null;
+const TTS = { on: false, playing: false, queue: [], idx: 0, utter: null, wake: null, gen: 0 };
+const RATES = [0.8, 1, 1.2, 1.4, 1.7, 2];
+const ICON = {
+  back: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>',
+  next: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>',
+  play: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4v16l13-8z"/></svg>',
+  pause: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'
+};
+const NOVELTY = /novelty|whisper|bells|bubbles|cellos|zarvox|trinoids|organ|bad news|good news|jester|superstar|wobble|boing|albert|fred|junior|ralph|kathy|grandma|grandpa|rocko|shelley|flo|eddy|reed|sandy/i;
+function ttsVoices(){ return synth ? synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang) && !NOVELTY.test(v.name)) : []; }
+function pickVoice(){
+  const vs = ttsVoices();
+  if (RS.voice){ const v = vs.find(x => x.voiceURI === RS.voice); if (v) return v; }
+  const score = v => (/en[-_]GB/i.test(v.lang) ? 8 : 0) + (/premium/i.test(v.name) ? 4 : /enhanced/i.test(v.name) ? 3 : 0) + (v.localService ? 1 : 0) - (/novelty|whisper|bells|bubbles|cellos|zarvox|trinoids|organ|bad news|good news|jester|superstar|wobble|boing/i.test(v.name) ? 20 : 0);
+  return vs.slice().sort((a, b) => score(b) - score(a))[0] || null;
+}
+if (synth && "onvoiceschanged" in synth) synth.onvoiceschanged = () => { if (!$("#rdSet").hidden) buildSettings(); };
+
+function textParts(block){
+  const parts = []; let pos = 0;
+  const w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement && n.parentElement.closest(".rd-sticky") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  let n; while ((n = w.nextNode())){ parts.push({ node: n, start: pos }); pos += n.data.length; }
+  return { text: parts.map(p => p.node.data).join(""), parts: parts };
+}
+const ABBR = /(?:\bet al|\be\.g|\bi\.e|\bfig|\bfigs|\beq|\beqs|\bref|\brefs|\bvs|\bcf|\betc|\bno|\bvol|\bpp|\bp|\bdr|\bprof|\bmr|\bmrs|\bms|\bst|\bapprox|\bca|\bsec|\bch|\b[A-Z])\.$/i;
+function splitSentences(t){
+  const cuts = []; const re = /[.!?]+["”’)\]]*\s+(?=["“‘(\[]?[A-Z0-9])/g; let m;
+  while ((m = re.exec(t))){
+    const end = m.index + m[0].length;
+    const before = t.slice(Math.max(0, m.index - 12), m.index + 1);
+    if (ABBR.test(before)) continue;
+    cuts.push(end);
+  }
+  const out = []; let s = 0;
+  cuts.concat([t.length]).forEach(c => { if (c > s){ out.push([s, c]); s = c; } });
+  const merged = [];
+  out.forEach(seg => { const last = merged[merged.length - 1]; if (last && (last[1] - last[0]) < 25) last[1] = seg[1]; else merged.push(seg.slice()); });
+  return merged.filter(([a, b]) => t.slice(a, b).trim());
+}
+function buildQueue(){
+  const q = [];
+  $("#rdText").querySelectorAll("p, h3").forEach(block => {
+    if (block.classList.contains("rd-small") || block.classList.contains("rd-msg")) return;
+    const { text } = textParts(block);
+    splitSentences(text).forEach(([s, e]) => q.push({ el: block, s: s, e: e, text: text.slice(s, e) }));
+  });
+  return q;
+}
+function cleanSpeech(t){
+  return t.replace(/\[[\d,;\s–\-]+\]/g, " ")
+    .replace(/\(\s*(?:[A-Z][A-Za-z'’\-]+(?:\s+(?:et al\.?|and|&)\s*[A-Za-z'’\-]*)?,?\s+\d{4}[a-z]?;?\s*)+\)/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1").replace(/\s+/g, " ").trim();
+}
+function rangeFor(block, s, e){
+  const { parts } = textParts(block); if (!parts.length) return null;
+  const find = off => { for (let i = parts.length - 1; i >= 0; i--) if (parts[i].start <= off) return { node: parts[i].node, off: Math.min(off - parts[i].start, parts[i].node.data.length) }; return { node: parts[0].node, off: 0 }; };
+  const a = find(s), b = find(Math.max(s, e - 0));
+  const r = document.createRange();
+  try { r.setStart(a.node, a.off); r.setEnd(b.node, b.off); } catch (err) { return null; }
+  return r;
+}
+function markSpoken(it){
+  $("#rdText").querySelectorAll(".rd-speaking").forEach(n => n.classList.remove("rd-speaking"));
+  const r = rangeFor(it.el, it.s, it.e);
+  if (HAS_HL_API && r){ try { CSS.highlights.set("rd-speak", new Highlight(r)); } catch (e) {} }
+  else it.el.classList.add("rd-speaking");
+  const sc = $("#rdScroll"), box = sc.getBoundingClientRect();
+  const rr = (r && r.getBoundingClientRect && r.getBoundingClientRect()) || it.el.getBoundingClientRect();
+  if (rr.top < box.top + 20 || rr.bottom > box.bottom - 40){
+    const dy = rr.top - box.top - box.height * 0.3;
+    try { sc.scrollBy({ top: dy, behavior: "smooth" }); } catch (e) { sc.scrollTop += dy; }
+  }
+}
+function clearSpoken(){
+  if (HAS_HL_API){ try { CSS.highlights.delete("rd-speak"); } catch (e) {} }
+  $("#rdText").querySelectorAll(".rd-speaking").forEach(n => n.classList.remove("rd-speaking"));
+}
+async function wakeOn(){ try { if (navigator.wakeLock && !TTS.wake) TTS.wake = await navigator.wakeLock.request("screen"); } catch (e) {} }
+function wakeOff(){ try { if (TTS.wake) TTS.wake.release(); } catch (e) {} TTS.wake = null; }
+
+function ttsSpeak(i){
+  if (!synth) return;
+  const gen = ++TTS.gen;
+  if (synth.speaking || synth.pending) synth.cancel();
+  let guard = 0;
+  while (i < TTS.queue.length && !cleanSpeech(TTS.queue[i].text) && guard++ < 50) i++;
+  TTS.idx = i;
+  if (i >= TTS.queue.length){ TTS.playing = false; clearSpoken(); updatePlayer(); wakeOff(); toast("Finished reading."); return; }
+  const it = TTS.queue[i];
+  markSpoken(it);
+  const u = new SpeechSynthesisUtterance(cleanSpeech(it.text));
+  const v = pickVoice(); if (v){ u.voice = v; u.lang = v.lang; } else u.lang = "en-GB";
+  u.rate = RS.rate || 1;
+  u.onend = () => { if (gen !== TTS.gen || !TTS.playing) return; ttsSpeak(i + 1); };
+  u.onerror = e => {
+    if (gen !== TTS.gen || e.error === "interrupted" || e.error === "canceled") return;
+    TTS.playing = false; updatePlayer(); wakeOff();
+    toast("Reading aloud stopped (" + e.error + "). Tap play to carry on.");
+  };
+  TTS.utter = u;
+  synth.speak(u);
+  TTS.playing = true; updatePlayer(); wakeOn();
+}
+function ttsPause(){
+  TTS.gen++; TTS.playing = false;
+  if (synth) synth.cancel();
+  wakeOff(); updatePlayer();
+}
+function firstVisibleIndex(){
+  const top = $("#rdScroll").getBoundingClientRect().top + 8;
+  for (let i = 0; i < TTS.queue.length; i++){
+    const r = rangeFor(TTS.queue[i].el, TTS.queue[i].s, TTS.queue[i].e);
+    const rect = r && r.getBoundingClientRect ? r.getBoundingClientRect() : TTS.queue[i].el.getBoundingClientRect();
+    if (rect.bottom > top) return i;
+  }
+  return 0;
+}
+function setListen(on){
+  if (on && !synth){ toast("This browser can’t read aloud."); return; }
+  if (on && !R.model){ toast("Wait for the paper to finish loading."); return; }
+  TTS.on = on;
+  $("#rdListenBtn").setAttribute("aria-pressed", String(on));
+  if (on){
+    TTS.queue = buildQueue();
+    if (!TTS.queue.length){ TTS.on = false; $("#rdListenBtn").setAttribute("aria-pressed", "false"); toast("There’s no text to read in this paper."); return; }
+    ttsSpeak(firstVisibleIndex());
+  } else {
+    ttsPause(); clearSpoken(); TTS.queue = [];
+  }
+  updatePlayer();
+}
+function updatePlayer(){
+  const p = $("#rdPlayer");
+  if (!TTS.on){ p.hidden = true; p.replaceChildren(); return; }
+  const b = (label, html, fn, cls) => { const x = el("button", { class: "pl-b" + (cls ? " " + cls : ""), "aria-label": label }); x.innerHTML = html; x.addEventListener("click", fn); return x; };
+  const pos = TTS.queue.length ? Math.round((TTS.idx / TTS.queue.length) * 100) : 0;
+  p.replaceChildren(
+    b("Previous sentence", ICON.back, () => ttsSpeak(Math.max(0, TTS.idx - 1))),
+    TTS.playing ? b("Pause", ICON.pause, ttsPause, "main") : b("Play", ICON.play, () => ttsSpeak(TTS.idx), "main"),
+    b("Next sentence", ICON.next, () => ttsSpeak(Math.min(TTS.queue.length - 1, TTS.idx + 1))),
+    el("button", { class: "pl-rate", "aria-label": "Reading speed", text: (RS.rate || 1) + "×", onclick: () => {
+      const i = RATES.indexOf(RS.rate || 1); RS.rate = RATES[(i + 1) % RATES.length]; lsSet("mfe-reader", RS);
+      if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer();
+    }}),
+    el("span", { class: "pl-pos", text: pos + "%" })
+  );
+  p.hidden = false;
+}
+$("#rdListenBtn").addEventListener("click", () => setListen(!TTS.on));
+if (!synth) $("#rdListenBtn").hidden = true;
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && TTS.playing) ttsPause(); });
+function jumpToTap(e){
+  const w = wordAt(e.clientX, e.clientY); if (!w) return false;
+  const block = w.startContainer.parentElement && w.startContainer.parentElement.closest("p, h3"); if (!block) return false;
+  const { parts } = textParts(block); const part = parts.find(p => p.node === w.startContainer); if (!part) return false;
+  const off = part.start + w.startOffset;
+  const i = TTS.queue.findIndex(it => it.el === block && off >= it.s && off < it.e);
+  if (i < 0) return false;
+  ttsSpeak(i); return true;
+}
+function ttsReset(){ if (TTS.on) setListen(false); }
 
 /* ================= Folders: create, rename, delete ================= */
 function folderTree(){
