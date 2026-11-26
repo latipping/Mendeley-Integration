@@ -644,7 +644,9 @@ function buildLibraryShell(app){
       search,
       el("div", { class: "filters", role: "group", "aria-label": "Filter" }, ...chips),
       el("div", { class: "selects" },
-        el("select", { id: "folderSel", "aria-label": "Folder", onchange: e => { v.folder = e.target.value; v.shown = 150; saveView(); drawList(); } }),
+        el("select", { id: "folderSel", "aria-label": "Folder", onchange: e => {
+          if (e.target.value === "__manage"){ e.target.value = v.folder || ""; openFolders(); return; }
+          v.folder = e.target.value; v.shown = 150; saveView(); drawList(); } }),
         el("select", { id: "tagSel", "aria-label": "Tag", onchange: e => { v.tag = e.target.value; v.shown = 150; saveView(); drawList(); } }),
         sortSel)
     ),
@@ -666,7 +668,7 @@ function renderLibrary(app){
   if (!tokenValid()) bb.append(el("div", { class: "banner" }, el("span", { text: "Sign in again to sync with Mendeley." }), el("button", { class: "btn small", text: "Sign in", onclick: signIn })));
   else if (S.lastError) bb.append(el("div", { class: "banner" }, el("span", { text: S.lastError })));
   const fs = $("#folderSel"), curF = S.view.folder;
-  fs.replaceChildren(el("option", { value: "", text: "All folders" }), ...S.folders.map(f => el("option", { value: f.id, text: (f.parent_id ? "  " : "") + f.name + " (" + ((S.members[f.id] || []).filter(id => S.lib.has(id)).length) + ")" })));
+  fs.replaceChildren(el("option", { value: "", text: "All folders" }), ...folderTree().map(x => el("option", { value: x.f.id, text: folderLabel(x.f, x.depth) + " (" + ((S.members[x.f.id] || []).filter(id => S.lib.has(id)).length) + ")" })), el("option", { value: "__manage", text: "Add or edit folders…" }));
   fs.value = S.folders.some(f => f.id === curF) ? curF : ""; S.view.folder = fs.value;
   const tags = new Map(); S.lib.forEach(d => (d.tags || []).forEach(t => tags.set(t, (tags.get(t) || 0) + 1)));
   const ts = $("#tagSel"), curT = S.view.tag;
@@ -799,13 +801,22 @@ function tagSection(d){
       input));
 }
 function folderSection(d){
-  if (!S.folders.length) return null;
+  const nameIn = el("input", { type: "text", class: "tag-in", style: "width:11rem", placeholder: "New folder", "aria-label": "New folder name", enterkeyhint: "done" });
+  const add = async () => {
+    const name = nameIn.value.trim(); if (!name) return;
+    nameIn.disabled = true; nameIn.blur();
+    try { const f = await createFolder(name, ""); setFolder(f.id, d.id, true); toast("Added to new folder “" + f.name + "”."); fillSheet(); render(); }
+    catch (e) { toast(folderErr(e), 6000); nameIn.disabled = false; }
+  };
+  nameIn.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); add(); } });
   return el("div", { class: "section" }, el("h3", { text: "Folders" }),
-    el("div", { class: "folders" }, ...S.folders.map(f => {
-      const cb = el("input", { type: "checkbox" }); cb.checked = (S.members[f.id] || []).includes(d.id);
-      cb.addEventListener("change", () => setFolder(f.id, d.id, cb.checked));
-      return el("label", {}, cb, el("span", { text: f.name }));
-    })));
+    el("div", { class: "folders" }, ...folderTree().map(x => {
+      const cb = el("input", { type: "checkbox" }); cb.checked = (S.members[x.f.id] || []).includes(d.id);
+      cb.addEventListener("change", () => setFolder(x.f.id, d.id, cb.checked));
+      const lab = el("label", { style: "padding-left:" + (x.depth * 18) + "px" }, cb, el("span", { text: x.f.name }));
+      return lab;
+    })),
+    el("div", { class: "tags", style: "margin-top:10px" }, nameIn, el("button", { class: "btn line small", text: "Add", onclick: add })));
 }
 function noteSection(d){
   const ta = el("textarea", { "aria-label": "Notes", placeholder: "Loading note…", disabled: true });
@@ -1052,7 +1063,7 @@ function buildSettings(){
       opt("Cream", RS.theme === "cream", () => RS.theme = "cream"),
       opt("White", RS.theme === "white", () => RS.theme = "white"),
       opt("Dark", RS.theme === "dark", () => RS.theme = "dark")),
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 5" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 6" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1663,6 +1674,94 @@ function showNotesList(){
       el("button", { class: "btn line small", text: "Close", onclick: hidePanel }))
   );
   $("#rdPanel").hidden = false;
+}
+
+/* ================= Folders: create, rename, delete ================= */
+function folderTree(){
+  const byParent = new Map(), ids = new Set(S.folders.map(f => f.id)), seen = new Set(), out = [];
+  S.folders.forEach(f => { const k = f.parent_id && ids.has(f.parent_id) ? f.parent_id : ""; if (!byParent.has(k)) byParent.set(k, []); byParent.get(k).push(f); });
+  const walk = (pid, depth) => {
+    (byParent.get(pid) || []).slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "en-GB", { sensitivity: "base" })).forEach(f => {
+      if (seen.has(f.id)) return; seen.add(f.id); out.push({ f: f, depth: depth }); walk(f.id, depth + 1);
+    });
+  };
+  walk("", 0);
+  return out;
+}
+const folderLabel = (f, depth) => "› ".repeat(depth) + f.name;
+function saveFolders(){ DB.set("folders", S.folders).catch(() => {}); DB.set("members", S.members).catch(() => {}); }
+async function createFolder(name, parentId){
+  name = (name || "").trim();
+  if (!name) throw new Error("Give the folder a name first.");
+  const body = { name: name }; if (parentId) body.parent_id = parentId;
+  const f = await api("POST", "/folders", { type: MT.folder, accept: MT.folder, body: JSON.stringify(body) });
+  S.folders.push(f); S.members[f.id] = []; saveFolders(); return f;
+}
+async function renameFolder(id, name){
+  name = (name || "").trim(); if (!name) throw new Error("The name can’t be empty.");
+  const f = await api("PATCH", "/folders/" + id, { type: MT.folder, accept: MT.folder, body: JSON.stringify({ name: name }) });
+  const cur = S.folders.find(x => x.id === id); if (cur) cur.name = (f && f.name) || name; saveFolders();
+}
+async function deleteFolder(id){
+  await api("DELETE", "/folders/" + id);
+  const gone = new Set([id]); let grew = true;
+  while (grew){ grew = false; S.folders.forEach(f => { if (f.parent_id && gone.has(f.parent_id) && !gone.has(f.id)){ gone.add(f.id); grew = true; } }); }
+  S.folders = S.folders.filter(f => !gone.has(f.id)); gone.forEach(g => delete S.members[g]);
+  if (gone.has(S.view.folder)){ S.view.folder = ""; saveView(); }
+  saveFolders();
+}
+const folderErr = e => e.code === "auth" ? "Sign in again to change folders." : e.code === "network" ? "You’re offline. Folders can only be changed with a connection." : e.message;
+function openFolders(){
+  sheetId = null; sheetMode = "folders";
+  const tree = folderTree();
+  const nameIn = el("input", { type: "text", placeholder: "Folder name", enterkeyhint: "done" });
+  const parentSel = el("select", {}, el("option", { value: "", text: "Top level" }), ...tree.map(x => el("option", { value: x.f.id, text: folderLabel(x.f, x.depth) })));
+  const make = el("button", { class: "btn", text: "Create folder" });
+  const doMake = async () => {
+    make.disabled = true;
+    try { const f = await createFolder(nameIn.value, parentSel.value); toast("Folder “" + f.name + "” created."); openFolders(); render(); }
+    catch (e) { toast(folderErr(e), 6000); make.disabled = false; }
+  };
+  make.addEventListener("click", doMake);
+  nameIn.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); doMake(); } });
+  const rows = tree.map(x => {
+    const count = (S.members[x.f.id] || []).filter(id => S.lib.has(id)).length;
+    const row = el("div", { style: "display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line);padding-left:" + (x.depth * 18) + "px" });
+    const show = () => {
+      let armed = false;
+      const del = el("button", { class: "btn danger small", text: "Delete" });
+      del.addEventListener("click", async () => {
+        if (!armed){ armed = true; del.classList.add("armed"); del.textContent = "Tap again"; setTimeout(() => { armed = false; if (del.isConnected){ del.classList.remove("armed"); del.textContent = "Delete"; } }, 4000); return; }
+        del.disabled = true;
+        try { await deleteFolder(x.f.id); toast("Folder deleted. Its papers are still in your library."); openFolders(); render(); }
+        catch (e) { toast(folderErr(e), 6000); del.disabled = false; }
+      });
+      row.replaceChildren(
+        el("button", { style: "flex:1;min-width:0;text-align:left;border:0;background:none;padding:0;font-size:1rem", onclick: () => { S.view.folder = x.f.id; S.view.shown = 150; saveView(); closeSheet(); } },
+          el("span", { text: x.f.name }), el("span", { style: "color:var(--muted);font-size:.85rem", text: "  " + count + (count === 1 ? " paper" : " papers") })),
+        el("button", { class: "btn line small", text: "Rename", onclick: () => {
+          const inp = el("input", { type: "text", style: "flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:16px;background:var(--surface)" }); inp.value = x.f.name;
+          const save = async () => { try { await renameFolder(x.f.id, inp.value); toast("Renamed."); openFolders(); render(); } catch (e) { toast(folderErr(e), 6000); } };
+          inp.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); save(); } });
+          row.replaceChildren(inp, el("button", { class: "btn small", text: "Save", onclick: save }), el("button", { class: "btn line small", text: "Cancel", onclick: show }));
+          setTimeout(() => inp.focus(), 50);
+        }}),
+        del);
+    };
+    show();
+    return row;
+  });
+  $("#sheetRight").replaceChildren();
+  setKids($("#sheetBody"),
+    el("h2", { text: "Folders" }),
+    el("div", { class: "section" }, el("h3", { text: "New folder" }),
+      el("label", { class: "field" }, el("span", { text: "Name" }), nameIn),
+      tree.length ? el("label", { class: "field" }, el("span", { text: "Inside" }), parentSel) : null,
+      el("div", { class: "actions" }, make)),
+    el("div", { class: "section" }, el("h3", { text: tree.length ? "Your folders" : "You don’t have any folders yet" }),
+      tree.length ? el("p", { class: "hint", text: "Tap a folder to show its papers. Deleting a folder doesn’t delete the papers in it." }) : null,
+      ...rows));
+  $("#sheet").classList.add("open"); $("#sheet").scrollTop = 0;
 }
 
 /* ================= Export for Claude ================= */
