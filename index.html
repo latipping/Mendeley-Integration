@@ -120,6 +120,12 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .pl-b.main{width:52px;height:52px;background:var(--rd-accent);border-color:var(--rd-accent);color:var(--rd-bg)}
 .pl-rate{min-width:52px;height:36px;border-radius:999px;border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);font-weight:600;font-variant-numeric:tabular-nums}
 .pl-pos{font-size:.82rem;color:var(--rd-muted);min-width:2.6rem;text-align:right;font-variant-numeric:tabular-nums}
+.rd-find{flex:none;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--rd-bar);border-bottom:1px solid var(--rd-line)}
+.rd-find input{flex:1;min-width:0;font-size:16px;padding:8px 10px;border-radius:10px;border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink)}
+.rd-find .cnt{font-size:.85rem;color:var(--rd-muted);min-width:4.5rem;text-align:center;font-variant-numeric:tabular-nums}
+.rd-find .fb{width:38px;height:38px;border-radius:50%;border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);font-size:1rem;padding:0;flex:none}
+::highlight(rd-find){background-color:rgba(255,196,0,.35);text-decoration:underline}
+::highlight(rd-find-cur){background-color:rgba(255,128,0,.8);color:#000;text-decoration:underline}
 ::highlight(rd-speak){background-color:rgba(255,214,102,.55)}
 .rd-speaking{background:rgba(255,214,102,.25)}
 .rd-tb[aria-expanded="true"]{background:var(--rd-line)}
@@ -191,10 +197,12 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
     <button class="rd-tb" id="rdListenBtn" aria-pressed="false">Listen</button>
     <button class="rd-tb" id="rdTapBtn" aria-pressed="false">Highlight</button>
     <button class="rd-tb" id="rdNotesBtn" aria-pressed="false">Notes</button>
+    <button class="rd-tb" id="rdFindBtn" aria-pressed="false" aria-label="Search in this paper"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
     <button class="rd-tb" id="rdSetBtn" aria-expanded="false" aria-label="Reading settings">Aa</button>
     <div class="rd-bar" id="rdBar" hidden></div>
   </div>
   <div class="rd-player" id="rdPlayer" hidden></div>
+  <div class="rd-find" id="rdFind" hidden></div>
   <div class="rd-prog"><div id="rdProg"></div></div>
   <div class="rd-set" id="rdSet" hidden></div>
   <div class="rd-scroll" id="rdScroll"><article class="rd-text" id="rdText"></article></div>
@@ -1095,7 +1103,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 12" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 13" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1238,7 +1246,7 @@ async function openReader(docId){
   R.title = d.title || "Paper"; $("#rdTitle").textContent = R.title; $("#rdTitle").classList.remove("hint");
   applyReaderSettings();
   $("#rdSet").hidden = true; $("#rdSetBtn").setAttribute("aria-expanded", "false");
-  ttsReset(); hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
+  ttsReset(); if (FIND.on) setFind(false); hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rdText").replaceChildren(el("p", { class: "rd-msg", text: "Getting the PDF…" }));
   $("#rdProg").style.width = "0";
   $("#rd").classList.add("open"); document.body.style.overflow = "hidden";
@@ -1333,7 +1341,7 @@ $("#rdScroll").addEventListener("scroll", () => {
   posTimer = setTimeout(() => { if (!R.model) return; const all = lsGet("mfe-pos", {}); all[R.docId] = +f.toFixed(4); lsSet("mfe-pos", all); }, 400);
 }, { passive: true });
 function closeReader(){
-  ttsReset(); R.gen++; hidePanel(); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
+  ttsReset(); if (FIND.on) setFind(false); R.gen++; hidePanel(); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rd").classList.remove("open"); document.body.style.overflow = "";
   $("#rdText").replaceChildren(); R.model = null; R.spanEls = [];
 }
@@ -1419,6 +1427,7 @@ function paintAnns(){
     R.touched.push(i);
   });
   if (R.lastRange && !R.lastRange.startContainer.isConnected) cancelSelection();
+  if (typeof FIND !== "undefined" && FIND.on && FIND.q) runFind(FIND.q, true);
 }
 function quoteFor(a){
   if (a._quote) return a._quote;
@@ -1875,6 +1884,76 @@ function jumpToTap(e){
   ttsSpeak(i); return true;
 }
 function ttsReset(){ if (TTS.on) setListen(false); }
+
+
+/* ================= Search within the paper ================= */
+const FIND = { on: false, ranges: [], cur: -1, q: "" };
+let findTimer;
+function clearFind(){
+  FIND.ranges = []; FIND.cur = -1;
+  if (HAS_HL_API){ try { CSS.highlights.delete("rd-find"); CSS.highlights.delete("rd-find-cur"); } catch (e) {} }
+}
+function findCount(){
+  const c = $("#rdFind .cnt"); if (!c) return;
+  c.textContent = FIND.q.trim().length < 2 ? "" : FIND.ranges.length ? (FIND.cur + 1) + " of " + FIND.ranges.length : "No matches";
+}
+function showFindCur(){
+  findCount();
+  const r = FIND.ranges[FIND.cur]; if (!r) return;
+  if (HAS_HL_API){ try { CSS.highlights.set("rd-find-cur", new Highlight(r)); } catch (e) {} }
+  else { try { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch (e) {} }
+  const sc = $("#rdScroll"), box = sc.getBoundingClientRect();
+  const node = r.startContainer.parentElement;
+  const rr = r.getBoundingClientRect ? r.getBoundingClientRect() : node.getBoundingClientRect();
+  if (rr.top < box.top + 30 || rr.bottom > box.bottom - 30){
+    const dy = rr.top - box.top - box.height * 0.35;
+    try { sc.scrollBy({ top: dy, behavior: "smooth" }); } catch (e) { sc.scrollTop += dy; }
+  }
+}
+function runFind(q, keepPlace){
+  const prev = FIND.cur;
+  clearFind(); FIND.q = q;
+  const needle = q.trim().replace(/\s+/g, " ").toLowerCase();
+  if (needle.length < 2 || !R.model){ findCount(); return; }
+  $("#rdText").querySelectorAll("p, h3").forEach(block => {
+    const low = textParts(block).text.toLowerCase();
+    let i = 0;
+    while ((i = low.indexOf(needle, i)) >= 0){ const r = rangeFor(block, i, i + needle.length); if (r) FIND.ranges.push(r); i += needle.length; }
+  });
+  if (!FIND.ranges.length){ findCount(); return; }
+  if (HAS_HL_API){ try { CSS.highlights.set("rd-find", new Highlight(...FIND.ranges)); } catch (e) {} }
+  if (keepPlace && prev >= 0) FIND.cur = Math.min(prev, FIND.ranges.length - 1);
+  else {
+    const top = $("#rdScroll").getBoundingClientRect().top;
+    FIND.cur = 0;
+    for (let k = 0; k < FIND.ranges.length; k++){
+      const rr = FIND.ranges[k].getBoundingClientRect ? FIND.ranges[k].getBoundingClientRect() : null;
+      if (rr && rr.bottom > top){ FIND.cur = k; break; }
+    }
+  }
+  showFindCur();
+}
+function stepFind(dir){
+  if (!FIND.ranges.length) return;
+  FIND.cur = (FIND.cur + dir + FIND.ranges.length) % FIND.ranges.length;
+  showFindCur();
+}
+function setFind(on){
+  FIND.on = on;
+  $("#rdFindBtn").setAttribute("aria-pressed", String(on));
+  const bar = $("#rdFind");
+  if (!on){ bar.hidden = true; bar.replaceChildren(); clearFind(); FIND.q = ""; return; }
+  const input = el("input", { type: "search", placeholder: "Search this paper", "aria-label": "Search this paper", enterkeyhint: "search", autocomplete: "off", autocapitalize: "off" });
+  input.addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(() => runFind(input.value, false), 220); });
+  input.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); if (FIND.q !== input.value) runFind(input.value, false); else stepFind(e.shiftKey ? -1 : 1); } else if (e.key === "Escape"){ setFind(false); } });
+  bar.replaceChildren(input,
+    el("span", { class: "cnt", "aria-live": "polite" }),
+    el("button", { class: "fb", "aria-label": "Previous match", text: "↑", onclick: () => stepFind(-1) }),
+    el("button", { class: "fb", "aria-label": "Next match", text: "↓", onclick: () => stepFind(1) }));
+  bar.hidden = false;
+  setTimeout(() => input.focus(), 50);
+}
+$("#rdFindBtn").addEventListener("click", () => setFind(!FIND.on));
 
 /* ================= Folders: create, rename, delete ================= */
 function folderTree(){
