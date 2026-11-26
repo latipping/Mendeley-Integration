@@ -1081,8 +1081,8 @@ function buildSettings(){
     })()) : null,
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
-    synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them on your iPhone in Settings, Accessibility, Spoken Content, Voices, English. Look for ones marked Enhanced or Premium." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 8" })
+    synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 9" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1706,13 +1706,16 @@ const ICON = {
   play: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4v16l13-8z"/></svg>',
   pause: '<svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'
 };
-const NOVELTY = /novelty|whisper|bells|bubbles|cellos|zarvox|trinoids|organ|bad news|good news|jester|superstar|wobble|boing|albert|fred|junior|ralph|kathy|grandma|grandpa|rocko|shelley|flo|eddy|reed|sandy/i;
-function ttsVoices(){ return synth ? synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang) && !NOVELTY.test(v.name)) : []; }
+const NOVELTY = /\b(whisper|bells|bubbles|cellos|zarvox|trinoids|pipe organ|bad news|good news|jester|superstar|wobble|boing|albert|bahh|fred|junior|ralph|kathy)\b/i;
+function voiceRank(v){ return (/en[-_]GB/i.test(v.lang) ? 8 : 0) + (/premium/i.test(v.name) ? 4 : /enhanced/i.test(v.name) ? 3 : 0) + (v.localService ? 1 : 0) - (NOVELTY.test(v.name) ? 20 : 0); }
+function ttsVoices(){
+  if (!synth) return [];
+  return synth.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang)).sort((a, b) => voiceRank(b) - voiceRank(a) || a.name.localeCompare(b.name));
+}
 function pickVoice(){
   const vs = ttsVoices();
   if (RS.voice){ const v = vs.find(x => x.voiceURI === RS.voice); if (v) return v; }
-  const score = v => (/en[-_]GB/i.test(v.lang) ? 8 : 0) + (/premium/i.test(v.name) ? 4 : /enhanced/i.test(v.name) ? 3 : 0) + (v.localService ? 1 : 0) - (/novelty|whisper|bells|bubbles|cellos|zarvox|trinoids|organ|bad news|good news|jester|superstar|wobble|boing/i.test(v.name) ? 20 : 0);
-  return vs.slice().sort((a, b) => score(b) - score(a))[0] || null;
+  return vs[0] || null;
 }
 if (synth && "onvoiceschanged" in synth) synth.onvoiceschanged = () => { if (!$("#rdSet").hidden) buildSettings(); };
 
