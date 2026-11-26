@@ -113,7 +113,7 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd.open{display:flex}
 .rd[data-theme="white"]{--rd-bg:#FFFFFF;--rd-ink:#1E1E1E;--rd-muted:#6B6B6B;--rd-line:#E2E2E2;--rd-bar:#F4F4F4;--rd-accent:#4338A8;--rd-hl-a:.75}
 .rd[data-theme="dark"]{--rd-bg:#16191D;--rd-ink:#E2E4E6;--rd-muted:#9AA3AD;--rd-line:#2C3238;--rd-bar:#1E2227;--rd-accent:#A39BF4;--rd-hl-a:.32}
-.rd-top{flex:none;display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top,0px) + 6px) 6px 6px;background:var(--rd-bar);border-bottom:1px solid var(--rd-line)}
+.rd-top{position:relative;z-index:5;flex:none;display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top,0px) + 6px) 6px 6px;background:var(--rd-bar);border-bottom:1px solid var(--rd-line)}
 .rd-tb{border:0;background:none;color:var(--rd-accent);font-weight:600;font-size:.95rem;padding:8px 10px;border-radius:8px;flex:none}
 .rd-tb[aria-expanded="true"]{background:var(--rd-line)}
 .rd-title{flex:1;min-width:0;font-family:var(--serif);font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--rd-muted);text-align:center}
@@ -124,7 +124,7 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd-set .lab{font-size:.82rem;color:var(--rd-muted);width:5.5rem;flex:none}
 .rd-opt{border:1px solid var(--rd-line);background:var(--rd-bg);color:var(--rd-ink);border-radius:999px;padding:6px 12px;font-size:.88rem}
 .rd-opt[aria-pressed="true"]{background:var(--rd-ink);color:var(--rd-bg);border-color:var(--rd-ink)}
-.rd-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rd-scroll{flex:1;overflow-y:auto}
 .rd-text{max-width:34em;margin:0 auto;padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 140px);font-size:var(--rd-size,19px);line-height:var(--rd-lh,1.7);text-align:left;-webkit-user-select:text;user-select:text;overflow-wrap:break-word}
 .rd[data-font="dyslexic"] .rd-text{font-family:"OpenDyslexic", var(--sans);letter-spacing:.01em;word-spacing:.12em}
 .rd[data-font="standard"] .rd-text{font-family:var(--sans)}
@@ -136,7 +136,16 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .rd-msg{color:var(--rd-muted);text-align:center;margin-top:3em}
 .rd-msg-box{text-align:left;max-width:30em;margin:2em auto;font-family:var(--sans);font-size:1rem;line-height:1.5}
 .rd-msg-box ol{padding-left:1.2rem}
-.rd-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;align-items:center;gap:10px;background:var(--rd-ink);color:var(--rd-bg);border-radius:999px;padding:8px 10px 8px 12px;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:3;white-space:nowrap}
+.rd-bar{position:absolute;left:8px;right:8px;top:calc(100% + 8px);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 10px;background:var(--rd-ink);color:var(--rd-bg);border-radius:16px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.28);z-index:6}
+.rd-hint{flex-basis:100%;text-align:center;font-size:.88rem;font-weight:500}
+.rd-bar .nb.warn{color:#FFB4A8}
+.rd-tb[aria-pressed="true"]{background:var(--rd-accent);color:var(--rd-bg)}
+.rd.tapmode .rd-text{cursor:pointer}
+::highlight(rd-pre){background-color:rgba(67,56,168,.30)}
+::highlight(rd-pre-dark){background-color:rgba(163,155,244,.45)}
+.rd-text ::selection{background:rgba(67,56,168,.30)}
+.li-row{display:flex;gap:10px;align-items:flex-start}
+.li-main{flex:1;min-width:0}
 .rd-dot{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgb(var(--hl));flex:none}
 .rd-bar .nb{border:0;background:none;color:var(--rd-bg);font-weight:600;font-size:.9rem;padding:6px 6px 6px 4px}
 .rd-panel{position:absolute;left:0;right:0;bottom:0;max-height:78%;overflow-y:auto;background:var(--rd-bar);color:var(--rd-ink);border-top:1px solid var(--rd-line);border-radius:16px 16px 0 0;padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 18px);z-index:4;box-shadow:0 -6px 24px rgba(0,0,0,.18);font-family:var(--sans)}
@@ -172,13 +181,14 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
   <div class="rd-top">
     <button class="rd-tb" id="rdClose">Done</button>
     <div class="rd-title" id="rdTitle"></div>
+    <button class="rd-tb" id="rdTapBtn" aria-pressed="false">Highlight</button>
     <button class="rd-tb" id="rdNotesBtn">Notes</button>
     <button class="rd-tb" id="rdSetBtn" aria-expanded="false" aria-label="Reading settings">Aa</button>
+    <div class="rd-bar" id="rdBar" hidden></div>
   </div>
   <div class="rd-prog"><div id="rdProg"></div></div>
   <div class="rd-set" id="rdSet" hidden></div>
   <div class="rd-scroll" id="rdScroll"><article class="rd-text" id="rdText"></article></div>
-  <div class="rd-bar" id="rdBar" hidden></div>
   <div class="rd-panel" id="rdPanel" hidden></div>
   <input type="file" id="rdPick" accept="application/pdf,.pdf" class="sr" aria-hidden="true" tabindex="-1">
 </section>
@@ -641,6 +651,7 @@ function buildLibraryShell(app){
     el("ul", { class: "list", id: "list" }),
     el("div", { id: "listFoot" }),
     el("p", { class: "hint", style: "margin-top:28px" },
+      el("button", { class: "btn quiet small", text: "Export for Claude", onclick: openExport }),
       el("button", { class: "btn quiet small", text: "Full resync", onclick: () => sync({ full: true }) }),
       el("button", { class: "btn quiet small", text: "Sign out", onclick: () => { if (S.outbox.length && !confirmSignOut()) return; signOut(); } }))
   );
@@ -1183,7 +1194,7 @@ async function openReader(docId){
   $("#rdTitle").textContent = d.title || "Paper";
   applyReaderSettings();
   $("#rdSet").hidden = true; $("#rdSetBtn").setAttribute("aria-expanded", "false");
-  hidePanel(); hideBar(true);
+  hidePanel(); R.tapMode = false; $("#rdTapBtn").setAttribute("aria-pressed", "false"); $("#rd").classList.remove("tapmode"); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rdText").replaceChildren(el("p", { class: "rd-msg", text: "Getting the PDF…" }));
   $("#rdProg").style.width = "0";
   $("#rd").classList.add("open"); document.body.style.overflow = "hidden";
@@ -1278,7 +1289,7 @@ $("#rdScroll").addEventListener("scroll", () => {
   posTimer = setTimeout(() => { if (!R.model) return; const all = lsGet("mfe-pos", {}); all[R.docId] = +f.toFixed(4); lsSet("mfe-pos", all); }, 400);
 }, { passive: true });
 function closeReader(){
-  R.gen++; hidePanel(); hideBar(true);
+  R.gen++; hidePanel(); R.lastRange = null; R.tapAnchor = null; clearPreview(); hideBar();
   $("#rd").classList.remove("open"); document.body.style.overflow = "";
   $("#rdText").replaceChildren(); R.model = null; R.spanEls = [];
 }
@@ -1363,6 +1374,7 @@ function paintAnns(){
     }
     R.touched.push(i);
   });
+  if (R.lastRange && !R.lastRange.startContainer.isConnected) cancelSelection();
 }
 function quoteFor(a){
   if (a._quote) return a._quote;
@@ -1371,41 +1383,104 @@ function quoteFor(a){
 }
 
 /* ---------- Selecting text to highlight ---------- */
-let barHideTimer;
-function showBar(){
-  clearTimeout(barHideTimer);
-  const bar = $("#rdBar");
-  if (!bar.childNodes.length){
+let barHideTimer, removeArmed = false;
+const HAS_HL_API = !!(window.CSS && CSS.highlights && window.Highlight);
+function showPreview(range){
+  if (!HAS_HL_API || !range) return;
+  try { clearPreview(); CSS.highlights.set(RS.theme === "dark" ? "rd-pre-dark" : "rd-pre", new Highlight(range)); } catch (e) {}
+}
+function clearPreview(){ if (!HAS_HL_API) return; try { CSS.highlights.delete("rd-pre"); CSS.highlights.delete("rd-pre-dark"); } catch (e) {} }
+function overlappingAnnIds(range){
+  const ids = new Set();
+  $("#rdText").querySelectorAll("mark[data-a]").forEach(m => { try { if (range.intersectsNode(m)) ids.add(m.dataset.a); } catch (e) {} });
+  return Array.from(ids);
+}
+function barButton(node, fn){
+  node.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
+  node.addEventListener("mousedown", e => e.preventDefault());
+  node.addEventListener("touchend", e => { e.preventDefault(); fn(); });
+  node.addEventListener("click", fn);
+  return node;
+}
+function updateBar(){
+  const bar = $("#rdBar"); removeArmed = false;
+  if (!R.model || !$("#rd").classList.contains("open")){ bar.hidden = true; return; }
+  const kids = [];
+  if (R.lastRange){
+    if (R.tapMode && R.tapStage === 1) kids.push(el("span", { class: "rd-hint", text: "Tap the last word, or pick a colour now" }));
     HL.forEach((h, ci) => {
       const b = el("button", { class: "rd-dot", "aria-label": "Highlight " + h.name });
       b.style.setProperty("--hl", rgb(h.c));
-      b.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
-      b.addEventListener("mousedown", e => e.preventDefault());
-      b.addEventListener("touchend", e => { e.preventDefault(); createHighlight(ci, false); });
-      b.addEventListener("click", () => createHighlight(ci, false));
-      bar.append(b);
+      kids.push(barButton(b, () => createHighlight(ci, false)));
     });
-    const nb = el("button", { class: "nb", text: "+ Note" });
-    nb.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
-    nb.addEventListener("mousedown", e => e.preventDefault());
-    nb.addEventListener("touchend", e => { e.preventDefault(); createHighlight(0, true); });
-    nb.addEventListener("click", () => createHighlight(0, true));
-    bar.append(nb);
-  }
-  bar.hidden = false;
+    kids.push(barButton(el("button", { class: "nb", text: "+ Note" }), () => createHighlight(0, true)));
+    const over = overlappingAnnIds(R.lastRange);
+    if (over.length){
+      const rb = el("button", { class: "nb warn", text: over.length > 1 ? "Remove " + over.length : "Remove" });
+      kids.push(barButton(rb, () => {
+        if (!removeArmed){ removeArmed = true; rb.textContent = "Tap again"; return; }
+        removeHighlights(over);
+      }));
+    }
+    kids.push(barButton(el("button", { class: "nb", "aria-label": "Cancel selection", text: "✕" }), cancelSelection));
+  } else if (R.tapMode){
+    kids.push(el("span", { class: "rd-hint", text: "Tap the first word you want to highlight" }));
+    kids.push(barButton(el("button", { class: "nb", text: "Done" }), () => setTapMode(false)));
+  } else { bar.hidden = true; return; }
+  bar.replaceChildren(...kids); bar.hidden = false;
 }
-function hideBar(now){
-  clearTimeout(barHideTimer);
-  if (now){ $("#rdBar").hidden = true; return; }
-  barHideTimer = setTimeout(() => { $("#rdBar").hidden = true; R.lastRange = null; }, 350);
+function hideBar(){ clearTimeout(barHideTimer); $("#rdBar").hidden = true; }
+function cancelSelection(){
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  R.lastRange = null; R.tapAnchor = null; R.tapStage = 0; clearPreview(); updateBar();
 }
+function setTapMode(on){
+  R.tapMode = on;
+  $("#rdTapBtn").setAttribute("aria-pressed", String(on));
+  $("#rd").classList.toggle("tapmode", on);
+  cancelSelection();
+}
+$("#rdTapBtn").addEventListener("click", () => setTapMode(!R.tapMode));
 document.addEventListener("selectionchange", () => {
   if (!$("#rd").classList.contains("open") || !R.model) return;
   const sel = window.getSelection();
   if (sel && sel.rangeCount && !sel.isCollapsed && $("#rdText").contains(sel.anchorNode) && sel.toString().trim()){
-    R.lastRange = sel.getRangeAt(0).cloneRange(); showBar();
-  } else hideBar(false);
+    clearTimeout(barHideTimer);
+    R.tapAnchor = null; R.tapStage = 0;
+    R.lastRange = sel.getRangeAt(0).cloneRange(); showPreview(R.lastRange); updateBar();
+  } else if (R.lastRange && !R.tapAnchor){
+    clearTimeout(barHideTimer);
+    barHideTimer = setTimeout(() => {
+      const s = window.getSelection(); if ((s && !s.isCollapsed) || R.tapAnchor) return;
+      R.lastRange = null; clearPreview(); updateBar();
+    }, 400);
+  }
 });
+function wordAt(x, y){
+  let node = null, off = 0;
+  if (document.caretRangeFromPoint){ const r = document.caretRangeFromPoint(x, y); if (r){ node = r.startContainer; off = r.startOffset; } }
+  else if (document.caretPositionFromPoint){ const p = document.caretPositionFromPoint(x, y); if (p){ node = p.offsetNode; off = p.offset; } }
+  if (!node || node.nodeType !== 3 || !$("#rdText").contains(node)) return null;
+  const t = node.data; let s = Math.min(off, t.length);
+  if ((s >= t.length || /\s/.test(t[s])) && s > 0 && /\S/.test(t[s - 1])) s--;
+  let e = s;
+  while (s > 0 && /\S/.test(t[s - 1])) s--;
+  while (e < t.length && /\S/.test(t[e])) e++;
+  if (e <= s) return null;
+  const r = document.createRange(); r.setStart(node, s); r.setEnd(node, e); return r;
+}
+function handleTap(e){
+  const w = wordAt(e.clientX, e.clientY); if (!w) return;
+  try { window.getSelection().removeAllRanges(); } catch (err) {}
+  if (!R.tapAnchor || R.tapStage !== 1){ R.tapAnchor = w; R.tapStage = 1; R.lastRange = w.cloneRange(); }
+  else {
+    const r = document.createRange();
+    if (w.compareBoundaryPoints(Range.START_TO_START, R.tapAnchor) < 0){ r.setStart(w.startContainer, w.startOffset); r.setEnd(R.tapAnchor.endContainer, R.tapAnchor.endOffset); }
+    else { r.setStart(R.tapAnchor.startContainer, R.tapAnchor.startOffset); r.setEnd(w.endContainer, w.endOffset); }
+    R.lastRange = r; R.tapStage = 2;
+  }
+  showPreview(R.lastRange); updateBar();
+}
 function offsetIn(root, node, off){ const r = document.createRange(); r.setStart(root, 0); r.setEnd(node, off); return r.toString().length; }
 function rangeToPositions(range){
   const m = R.model; const segs = [];
@@ -1434,7 +1509,7 @@ function createHighlight(ci, withNote){
   if (!range || !R.model || !R.file){ toast("Select some text in the paper first."); return; }
   const positions = rangeToPositions(range);
   const quote = range.toString().replace(/\s+/g, " ").trim();
-  window.getSelection().removeAllRanges(); R.lastRange = null; hideBar(true);
+  cancelSelection();
   if (!positions.length){ toast("Select some text in the paper first."); return; }
   const body = { type: "highlight", document_id: R.docId, positions: positions, color: HL[ci].c, privacy_level: "private" };
   if (R.file.filehash) body.filehash = R.file.filehash;
@@ -1444,6 +1519,16 @@ function createHighlight(ci, withNote){
   queue({ t: "annNew", tmp: tmp, doc: R.docId, body: body });
   if (withNote) openAnnPanel(tmp, true);
 }
+function removeHighlights(ids){
+  const set = new Set(ids);
+  const gone = R.anns.filter(a => set.has(a.id));
+  R.anns = R.anns.filter(a => !set.has(a.id));
+  paintAnns(); saveAnns(R.docId);
+  gone.forEach(a => annDelete(a.id));
+  cancelSelection();
+  toast(gone.length > 1 ? gone.length + " highlights removed." : "Highlight removed.");
+}
+
 async function replaceTempAnn(docId, tmp, real){
   annIdMap[tmp] = real.id; lsSet("mfe-annmap", annIdMap);
   const fix = list => list.map(a => a.id === tmp ? Object.assign({}, real, { _quote: a._quote, text: a.text !== undefined ? a.text : real.text, color: a.color || real.color }) : a);
@@ -1490,9 +1575,10 @@ function openAnnPanel(id, focusNote){
     b.addEventListener("click", () => { colour = h.c; q.style.setProperty("--hl", rgb(colour)); dots.querySelectorAll(".rd-dot").forEach(x => x.setAttribute("aria-pressed", String(x === b))); });
     return b;
   }));
-  const del = el("button", { class: "btn danger small", text: "Delete" });
+  const delLabel = a.type === "sticky_note" ? "Delete note" : "Delete highlight";
+  const del = el("button", { class: "btn danger small", text: delLabel });
   del.addEventListener("click", () => {
-    if (!armed){ armed = true; del.classList.add("armed"); del.textContent = "Tap again to delete"; setTimeout(() => { armed = false; if (del.isConnected){ del.classList.remove("armed"); del.textContent = "Delete"; } }, 4000); return; }
+    if (!armed){ armed = true; del.classList.add("armed"); del.textContent = "Tap again to delete"; setTimeout(() => { armed = false; if (del.isConnected){ del.classList.remove("armed"); del.textContent = delLabel; } }, 4000); return; }
     const cur = R.anns.find(x => x.id === R.panelAnn) || a;
     R.anns = R.anns.filter(x => x !== cur); paintAnns(); saveAnns(R.docId); annDelete(cur.id); hidePanel();
   });
@@ -1515,6 +1601,7 @@ function openAnnPanel(id, focusNote){
   if (focusNote) setTimeout(() => ta.focus(), 150);
 }
 $("#rdText").addEventListener("click", e => {
+  if (R.tapMode){ handleTap(e); return; }
   const t = e.target.closest && e.target.closest("[data-a]");
   if (!t) return;
   const sel = window.getSelection(); if (sel && !sel.isCollapsed) return;
@@ -1522,6 +1609,9 @@ $("#rdText").addEventListener("click", e => {
 });
 $("#rdNotesBtn").addEventListener("click", () => {
   if (!$("#rdPanel").hidden && !R.panelAnn){ hidePanel(); return; }
+  showNotesList();
+});
+function showNotesList(){
   const box = $("#rdText");
   const firstEl = a => box.querySelector('[data-a="' + CSS.escape(a.id) + '"]');
   const list = R.anns.map(a => ({ a: a, n: firstEl(a) })).filter(x => x.n)
@@ -1533,13 +1623,25 @@ $("#rdNotesBtn").addEventListener("click", () => {
     const txt = head + list.map(x => (x.a.type === "sticky_note" ? "Note" : "“" + quoteFor(x.a) + "”") + (x.a.text ? "\n  " + x.a.text.trim() : "")).join("\n\n");
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast("Highlights copied."), () => toast("Couldn’t copy. Your browser blocked it."));
   };
-  setKids($("#rdPanel"), 
+  setKids($("#rdPanel"),
     el("h4", { text: list.length ? list.length + " highlight" + (list.length === 1 ? "" : "s") + " and notes" : "No highlights yet" }),
-    list.length ? null : el("p", { class: "hint", text: "Select text in the paper, then tap a colour to highlight it. Highlights sync to the PDF in Mendeley." }),
+    list.length ? null : el("p", { class: "hint", text: "Tap Highlight at the top, then tap the first and last words you want. Or press and hold to select text. Then pick a colour." }),
     el("ul", { class: "rd-list" }, ...list.map(x => {
+      let armed = false;
+      const del = el("button", { class: "btn danger small", text: "Delete" });
+      del.addEventListener("click", ev => {
+        ev.stopPropagation();
+        if (!armed){ armed = true; del.classList.add("armed"); del.textContent = "Tap again"; setTimeout(() => { armed = false; if (del.isConnected){ del.classList.remove("armed"); del.textContent = "Delete"; } }, 4000); return; }
+        R.anns = R.anns.filter(a => a !== x.a); paintAnns(); saveAnns(R.docId); annDelete(x.a.id);
+        toast(x.a.type === "sticky_note" ? "Note deleted." : "Highlight removed.");
+        showNotesList();
+      });
       const li = el("li", {},
-        el("div", { class: "q", text: x.a.type === "sticky_note" ? "Sticky note" : (quoteFor(x.a) || "Highlight") }),
-        x.a.text ? el("div", { class: "n", text: x.a.text }) : null);
+        el("div", { class: "li-row" },
+          el("div", { class: "li-main" },
+            el("div", { class: "q", text: x.a.type === "sticky_note" ? "Sticky note" : (quoteFor(x.a) || "Highlight") }),
+            x.a.text ? el("div", { class: "n", text: x.a.text }) : null),
+          del));
       li.querySelector(".q").style.setProperty("--hl", rgb(x.a.color));
       li.addEventListener("click", () => { hidePanel(); x.n.scrollIntoView({ block: "center", behavior: "smooth" }); x.n.classList.add("flash"); setTimeout(() => x.n.classList.remove("flash"), 1500); });
       return li;
@@ -1549,7 +1651,148 @@ $("#rdNotesBtn").addEventListener("click", () => {
       el("button", { class: "btn line small", text: "Close", onclick: hidePanel }))
   );
   $("#rdPanel").hidden = false;
-});
+}
+
+/* ================= Export for Claude ================= */
+function coverText(m, positions){
+  const segs = [];
+  (positions || []).forEach(pos => {
+    if (!pos || !pos.top_left || !pos.bottom_right) return;
+    const xl = Math.min(pos.top_left.x, pos.bottom_right.x), xr = Math.max(pos.top_left.x, pos.bottom_right.x);
+    const yb = Math.min(pos.top_left.y, pos.bottom_right.y), yt = Math.max(pos.top_left.y, pos.bottom_right.y);
+    m.items.forEach((it, i) => {
+      if (it.p !== pos.page || it.l === undefined) return;
+      const ib = it.y - it.h * 0.2, itp = it.y + it.h * 0.8;
+      if (Math.min(yt, itp) - Math.max(yb, ib) < it.h * 0.4) return;
+      if (xr < it.x || xl > it.x + it.w) return;
+      const L = it.s.length, cw = it.w / Math.max(1, L);
+      const s = Math.max(0, Math.min(L, Math.round((xl - it.x) / cw))), e = Math.max(0, Math.min(L, Math.round((xr - it.x) / cw)));
+      if (e > s) segs.push({ i: i, t: disp(it).slice(s, e) });
+    });
+  });
+  segs.sort((a, b) => a.i - b.i);
+  return segs.map(x => x.t).join(" ").replace(/\s+/g, " ").trim();
+}
+function modelText(m){
+  return m.paras.map(p => {
+    const t = p.t.map(x => x === " " ? " " : disp(m.items[x])).join("").replace(/\s+/g, " ").trim();
+    return p.k === "h" ? "#### " + t : t;
+  }).filter(Boolean).join("\n\n");
+}
+async function buildExport(docs, incAnn, incText, onStatus){
+  const annsByDoc = new Map();
+  if (incAnn && tokenValid()){
+    onStatus("Fetching highlights and notes from Mendeley…");
+    try {
+      const all = await listAll("/annotations?limit=200", MT.ann, n => onStatus("Fetching highlights and notes… " + n));
+      all.forEach(a => { if (!a.document_id) return; let l = annsByDoc.get(a.document_id); if (!l){ l = []; annsByDoc.set(a.document_id, l); } l.push(a); });
+    } catch (e) { if (e.code === "auth") throw e; }
+  }
+  const folderNames = new Map();
+  S.folders.forEach(f => (S.members[f.id] || []).forEach(id => { let l = folderNames.get(id); if (!l){ l = []; folderNames.set(id, l); } l.push(f.name); }));
+  const out = ["# My Mendeley library", "", "Exported " + new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) + ". " + docs.length + (docs.length === 1 ? " paper." : " papers."), ""];
+  let withText = 0, withHl = 0;
+  for (let k = 0; k < docs.length; k++){
+    const d = docs[k];
+    if (k % 20 === 0) onStatus("Writing paper " + (k + 1) + " of " + docs.length + "…");
+    out.push("## " + (d.title || "Untitled"), "");
+    const meta = [];
+    if (d.authors && d.authors.length) meta.push("Authors: " + fullAuthors(d.authors));
+    if (d.year) meta.push("Year: " + d.year);
+    if (venue(d)) meta.push("Published in: " + venue(d));
+    if (d.type) meta.push("Type: " + d.type.replace(/_/g, " "));
+    const ids = d.identifiers || {};
+    if (ids.doi) meta.push("DOI: " + ids.doi);
+    if (ids.isbn) meta.push("ISBN: " + ids.isbn);
+    if (d.tags && d.tags.length) meta.push("Tags: " + d.tags.join(", "));
+    if (folderNames.get(d.id)) meta.push("Folders: " + folderNames.get(d.id).join(", "));
+    meta.push("Status: " + (d.read ? "read" : "unread") + (d.starred ? ", starred" : ""));
+    meta.forEach(x => out.push("- " + x)); out.push("");
+    if (d.abstract) out.push("### Abstract", "", d.abstract.trim(), "");
+    let model = null, cachedAnns = null;
+    try {
+      const fs = await DB.get("files:" + d.id); const f = pickPdf(fs);
+      if (f) model = await DB.get("txt:" + f.id);
+      cachedAnns = await DB.get("ann:" + d.id);
+    } catch (e) {}
+    const anns = annsByDoc.get(d.id) || [];
+    const notes = anns.filter(a => a.type === "note" && a.text).map(a => stripHtml(a.text)).filter(Boolean);
+    if (notes.length) out.push("### My notes", "", notes.join("\n\n"), "");
+    const quotes = new Map((cachedAnns || []).map(a => [a.id, a._quote]));
+    const hls = anns.filter(a => a.type === "highlight" || a.type === "sticky_note").sort((a, b) => {
+      const pa = (a.positions && a.positions[0]) || {}, pb = (b.positions && b.positions[0]) || {};
+      return (pa.page || 0) - (pb.page || 0) || ((pb.top_left && pb.top_left.y) || 0) - ((pa.top_left && pa.top_left.y) || 0);
+    });
+    if (hls.length){
+      withHl++;
+      out.push("### My highlights", "");
+      hls.forEach(a => {
+        const page = a.positions && a.positions[0] && a.positions[0].page;
+        const where = page ? "p. " + page + ": " : "";
+        if (a.type === "sticky_note") out.push("- " + where + "Note: " + stripHtml(a.text || ""));
+        else {
+          const q = quotes.get(a.id) || (model ? coverText(model, a.positions) : "");
+          out.push("- " + where + (q ? "“" + q + "”" : "(highlighted passage; open the paper once in the reader to include its text)"));
+          if (a.text) out.push("  Note: " + stripHtml(a.text));
+        }
+      });
+      out.push("");
+    }
+    if (incText && model){ withText++; out.push("### Full text", "", modelText(model), ""); }
+    out.push("---", "");
+  }
+  return { text: out.join("\n"), withText: withText, withHl: withHl };
+}
+function openExport(){
+  sheetId = null; sheetMode = "export";
+  const viewDocs = visible(), allDocs = Array.from(S.lib.values());
+  const scopeAll = el("input", { type: "radio", name: "exscope", checked: true });
+  const scopeView = el("input", { type: "radio", name: "exscope" });
+  const incAnn = el("input", { type: "checkbox", checked: true });
+  const incText = el("input", { type: "checkbox", checked: true });
+  const status = el("p", { class: "hint", "aria-live": "polite" });
+  const result = el("div", {});
+  const lab = (input, text) => el("label", { style: "display:flex;gap:10px;align-items:flex-start;padding:8px 0" }, input, el("span", { text: text }));
+  const prep = el("button", { class: "btn", text: "Prepare export" });
+  prep.addEventListener("click", async () => {
+    prep.disabled = true; result.replaceChildren();
+    try {
+      const docs = scopeView.checked ? viewDocs : allDocs;
+      const r = await buildExport(docs, incAnn.checked, incText.checked, t => status.textContent = t);
+      const date = new Date().toISOString().slice(0, 10);
+      const name = "mendeley-library-" + date + ".md";
+      const file = new File([r.text], name, { type: "text/markdown" });
+      const mb = (file.size / 1048576).toFixed(1);
+      status.textContent = "Ready. " + docs.length + (docs.length === 1 ? " paper, " : " papers, ") + r.withHl + " with highlights, " + r.withText + " with full text (" + mb + " MB).";
+      const canShare = navigator.canShare && navigator.canShare({ files: [file] });
+      setKids(result,
+        el("div", { class: "actions" },
+          canShare ? el("button", { class: "btn", text: "Share to Claude…", onclick: () => navigator.share({ files: [file], title: "My Mendeley library" }).catch(() => {}) }) : null,
+          el("button", { class: canShare ? "btn line" : "btn", text: "Save to Files", onclick: () => {
+            const url = URL.createObjectURL(file); const a = document.createElement("a");
+            a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          }})));
+    } catch (e) {
+      status.textContent = e.code === "auth" ? "Sign in again, then try once more." : "Export failed: " + e.message;
+    }
+    prep.disabled = false;
+  });
+  $("#sheetRight").replaceChildren();
+  setKids($("#sheetBody"),
+    el("h2", { text: "Export for Claude" }),
+    el("p", { text: "Makes one file with your papers’ details, abstracts, notes, highlights and full text, ready to add to a Claude project so Claude can work across your whole library." }),
+    el("div", { class: "section" }, el("h3", { text: "Which papers" }),
+      lab(scopeAll, "Whole library (" + allDocs.length + ")"),
+      lab(scopeView, "Only the current list on screen (" + viewDocs.length + ")")),
+    el("div", { class: "section" }, el("h3", { text: "Include" }),
+      lab(incAnn, "Highlights and notes"),
+      lab(incText, "Full text of papers saved on this phone")),
+    el("p", { class: "hint", text: "Full text and highlighted passages come from papers you’ve opened in the reader at least once, since those are the ones saved on this phone." }),
+    el("div", { class: "actions" }, prep),
+    status, result);
+  $("#sheet").classList.add("open"); $("#sheet").scrollTop = 0;
+}
 
 /* ================= Start ================= */
 async function start(){
