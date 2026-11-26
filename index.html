@@ -182,7 +182,7 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
     <button class="rd-tb" id="rdClose">Done</button>
     <div class="rd-title" id="rdTitle"></div>
     <button class="rd-tb" id="rdTapBtn" aria-pressed="false">Highlight</button>
-    <button class="rd-tb" id="rdNotesBtn">Notes</button>
+    <button class="rd-tb" id="rdNotesBtn" aria-pressed="false">Notes</button>
     <button class="rd-tb" id="rdSetBtn" aria-expanded="false" aria-label="Reading settings">Aa</button>
     <div class="rd-bar" id="rdBar" hidden></div>
   </div>
@@ -1051,7 +1051,8 @@ function buildSettings(){
     el("div", { class: "grp" }, el("span", { class: "lab", text: "Background" }),
       opt("Cream", RS.theme === "cream", () => RS.theme = "cream"),
       opt("White", RS.theme === "white", () => RS.theme = "white"),
-      opt("Dark", RS.theme === "dark", () => RS.theme = "dark"))
+      opt("Dark", RS.theme === "dark", () => RS.theme = "dark")),
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 5" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -1404,7 +1405,7 @@ function barButton(node, fn){
 }
 function updateBar(){
   const bar = $("#rdBar"); removeArmed = false;
-  if (!R.model || !$("#rd").classList.contains("open")){ bar.hidden = true; return; }
+  if (!R.model || !$("#rd").classList.contains("open") || !R.tapMode){ bar.hidden = true; bar.replaceChildren(); updateTitle(); return; }
   const kids = [];
   if (R.lastRange){
     HL.forEach((h, ci) => {
@@ -1446,13 +1447,14 @@ function cancelSelection(){
 }
 function setTapMode(on){
   R.tapMode = on;
+  hidePanel();
   $("#rdTapBtn").setAttribute("aria-pressed", String(on));
   $("#rd").classList.toggle("tapmode", on);
   cancelSelection();
 }
 $("#rdTapBtn").addEventListener("click", () => setTapMode(!R.tapMode));
 document.addEventListener("selectionchange", () => {
-  if (!$("#rd").classList.contains("open") || !R.model) return;
+  if (!$("#rd").classList.contains("open") || !R.model || !R.tapMode) return;
   const sel = window.getSelection();
   if (sel && sel.rangeCount && !sel.isCollapsed && $("#rdText").contains(sel.anchorNode) && sel.toString().trim()){
     clearTimeout(barHideTimer);
@@ -1571,7 +1573,7 @@ function annDelete(id){
 }
 
 /* ---------- Panels ---------- */
-function hidePanel(){ $("#rdPanel").hidden = true; R.panelAnn = null; }
+function hidePanel(){ $("#rdPanel").hidden = true; R.panelAnn = null; $("#rdNotesBtn").setAttribute("aria-pressed", "false"); }
 function openAnnPanel(id, focusNote){
   const a = R.anns.find(x => x.id === id || resolveAnnId(x.id) === resolveAnnId(id)); if (!a) return;
   R.panelAnn = a.id;
@@ -1611,14 +1613,11 @@ function openAnnPanel(id, focusNote){
   if (focusNote) setTimeout(() => ta.focus(), 150);
 }
 $("#rdText").addEventListener("click", e => {
-  if (R.tapMode){ handleTap(e); return; }
-  const t = e.target.closest && e.target.closest("[data-a]");
-  if (!t) return;
-  const sel = window.getSelection(); if (sel && !sel.isCollapsed) return;
-  openAnnPanel(t.dataset.a, false);
+  if (R.tapMode) handleTap(e);
 });
 $("#rdNotesBtn").addEventListener("click", () => {
-  if (!$("#rdPanel").hidden && !R.panelAnn){ hidePanel(); return; }
+  if (!$("#rdPanel").hidden){ hidePanel(); return; }
+  if (R.tapMode) setTapMode(false);
   showNotesList();
 });
 function showNotesList(){
@@ -1633,9 +1632,10 @@ function showNotesList(){
     const txt = head + list.map(x => (x.a.type === "sticky_note" ? "Note" : "“" + quoteFor(x.a) + "”") + (x.a.text ? "\n  " + x.a.text.trim() : "")).join("\n\n");
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast("Highlights copied."), () => toast("Couldn’t copy. Your browser blocked it."));
   };
+  $("#rdNotesBtn").setAttribute("aria-pressed", "true");
   setKids($("#rdPanel"),
     el("h4", { text: list.length ? list.length + " highlight" + (list.length === 1 ? "" : "s") + " and notes" : "No highlights yet" }),
-    list.length ? null : el("p", { class: "hint", text: "Tap Highlight at the top, then tap the first and last words you want. Or press and hold to select text. Then pick a colour." }),
+    list.length ? null : el("p", { class: "hint", text: "Tap Highlight at the top, then tap the first and last words you want and pick a colour." }),
     el("ul", { class: "rd-list" }, ...list.map(x => {
       let armed = false;
       const del = el("button", { class: "btn danger small", text: "Delete" });
@@ -1646,12 +1646,14 @@ function showNotesList(){
         toast(x.a.type === "sticky_note" ? "Note deleted." : "Highlight removed.");
         showNotesList();
       });
+      const edit = el("button", { class: "btn line small", text: "Edit" });
+      edit.addEventListener("click", ev => { ev.stopPropagation(); openAnnPanel(x.a.id, true); $("#rdNotesBtn").setAttribute("aria-pressed", "true"); });
       const li = el("li", {},
         el("div", { class: "li-row" },
           el("div", { class: "li-main" },
             el("div", { class: "q", text: x.a.type === "sticky_note" ? "Sticky note" : (quoteFor(x.a) || "Highlight") }),
             x.a.text ? el("div", { class: "n", text: x.a.text }) : null),
-          del));
+          el("div", { style: "display:flex;flex-direction:column;gap:6px" }, edit, del)));
       li.querySelector(".q").style.setProperty("--hl", rgb(x.a.color));
       li.addEventListener("click", () => { hidePanel(); x.n.scrollIntoView({ block: "center", behavior: "smooth" }); x.n.classList.add("flash"); setTimeout(() => x.n.classList.remove("flash"), 1500); });
       return li;
