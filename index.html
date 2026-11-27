@@ -105,6 +105,18 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .toast.show{display:block}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){.sheet.open{animation:none}}
+.dys{font-family:"OpenDyslexic", var(--sans);letter-spacing:.01em}
+.quiz-q{font-family:var(--sans);font-size:1.2rem;line-height:1.45;font-weight:600}
+.quiz-q.dys{font-family:"OpenDyslexic", var(--sans)}
+.quiz-opt{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:12px 14px;margin:8px 0;font-size:1rem;line-height:1.45}
+.quiz-opt:disabled{opacity:1;cursor:default}
+.quiz-letter{flex:none;width:1.8em;height:1.8em;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:600;font-family:var(--sans);font-size:.9em}
+.quiz-opt.right{border-color:#2E7D32;background:rgba(46,125,50,.14);border-width:3px}
+.quiz-opt.wrong{border-color:var(--danger);background:rgba(180,35,24,.10);border-style:dashed;border-width:3px}
+.quiz-mark{font-weight:700;margin-left:auto}
+.quiz-fb{font-weight:700;margin:14px 0 6px}
+.quiz-bar{height:4px;background:var(--line);border-radius:2px;margin:4px 0 12px;overflow:hidden}
+.quiz-bar div{height:100%;background:var(--accent)}
 
 /* ---------- Text reader ---------- */
 .rd{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;
@@ -671,6 +683,7 @@ function buildLibraryShell(app){
     el("div", { id: "listFoot" }),
     el("p", { class: "hint", style: "margin-top:28px" },
       el("button", { class: "btn quiet small", text: "Export for Claude", onclick: openExport }),
+      el("button", { class: "btn quiet small", text: "Gemini settings", onclick: () => { sheetId = null; openGeminiSettings(null); } }),
       el("button", { class: "btn quiet small", text: "E-book of this list", onclick: () => {
         const docs = visible(); if (!docs.length){ toast("The list is empty."); return; }
         const f = S.view.folder && S.folders.find(x => x.id === S.view.folder);
@@ -795,7 +808,8 @@ function fillSheet(){
       el("button", { class: "btn line", text: d.read ? "Mark unread" : "Mark read", onclick: () => edit(d.id, { read: !d.read }) }),
       el("button", { class: "btn line", text: "Edit details", onclick: () => openEdit(d.id) }),
       el("button", { class: "btn line", text: "Update from DOI or ISBN", onclick: () => openLookup(d.id) }),
-      d.file_attached ? el("button", { class: "btn line", text: "E-book", onclick: () => openEbook([d], d.title || "Paper") }) : null
+      d.file_attached ? el("button", { class: "btn line", text: "E-book", onclick: () => openEbook([d], d.title || "Paper") }) : null,
+      d.file_attached || d.abstract ? el("button", { class: "btn line", text: "Quiz me", onclick: () => openQuiz(d.id) }) : null
     ),
     doi ? el("div", { class: "section" }, el("h3", { text: "DOI" }), el("a", { class: "doi", href: "https://doi.org/" + encodeURI(doi), target: "_blank", rel: "noopener noreferrer", text: doi })) : null,
     !doi && web ? el("div", { class: "section" }, el("h3", { text: "Link" }), el("a", { class: "doi", href: web, target: "_blank", rel: "noopener noreferrer", text: web })) : null,
@@ -1103,7 +1117,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 13" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 14" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -2348,6 +2362,242 @@ function openEbook(docs, bookTitle){
       el("p", { class: "hint", text: "Boox: save the file and open it from Downloads in the NeoReader app." }),
       el("p", { class: "hint", text: "Kindle: add the file to Calibre on a computer, convert it to AZW3, then send it to the Kindle over USB. It stays on the device only. To see OpenDyslexic, choose Publisher Font in the Kindle’s Aa menu." })));
   $("#sheet").classList.add("open"); $("#sheet").scrollTop = 0;
+}
+
+/* ================= Quiz me (Gemini) ================= */
+const GEM_API = "https://generativelanguage.googleapis.com/v1beta";
+const GEM_KEY = "mfe-gemini";
+const gem = () => lsGet(GEM_KEY, {});
+const QUIZ_SCHEMA = {
+  type: "OBJECT",
+  properties: { questions: { type: "ARRAY", items: { type: "OBJECT", properties: {
+    question: { type: "STRING" },
+    options: { type: "ARRAY", items: { type: "STRING" } },
+    answer_index: { type: "INTEGER" },
+    explanation: { type: "STRING" },
+    page: { type: "INTEGER" },
+    difficulty: { type: "STRING", enum: ["easy", "medium", "hard"] }
+  }, required: ["question", "options", "answer_index", "explanation"] } } },
+  required: ["questions"]
+};
+function gemError(status, body){
+  const msg = (body && body.error && body.error.message) || "";
+  if (status === 400 && /api key/i.test(msg)) return "Gemini didn’t accept that API key. Check it in Gemini settings.";
+  if (status === 403) return "That API key isn’t allowed to use Gemini here. If you restricted the key, allow the Generative Language API and this website.";
+  if (status === 404) return "That Gemini model isn’t available. Pick another one in Gemini settings.";
+  if (status === 429) return "Gemini’s usage limit has been reached. Wait a minute and try again.";
+  if (status >= 500) return "Gemini is having problems right now. Try again shortly.";
+  return "Gemini replied " + status + (msg ? ": " + msg.slice(0, 160) : ".");
+}
+async function gemFetch(path, init, timeoutMs){
+  const g = gem(); if (!g.key) throw new Error("Add your Gemini API key first.");
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs || 30000);
+  let res;
+  try { res = await fetch(GEM_API + path, Object.assign({}, init, { signal: ctl.signal, headers: Object.assign({ "x-goog-api-key": g.key }, (init && init.headers) || {}) })); }
+  catch (e) { throw new Error(e.name === "AbortError" ? "Gemini took too long to answer. Try again." : "Couldn’t reach Gemini. Check your connection."); }
+  finally { clearTimeout(t); }
+  let body = null; try { body = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(gemError(res.status, body));
+  return body;
+}
+async function gemModels(){
+  const body = await gemFetch("/models?pageSize=200", { method: "GET" }, 15000);
+  const list = (body.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => m.name.replace(/^models\//, ""))
+    .filter(n => /^gemini-/.test(n) && !/(tts|image|live|audio|embedding|robotics|computer-use|learnlm|native)/i.test(n));
+  const ver = n => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
+  const rank = n => ver(n) * 10 + (/flash/.test(n) && !/lite/.test(n) ? 3 : /pro/.test(n) ? 2 : 1) - (/(preview|exp)/.test(n) ? 5 : 0) - (/latest/.test(n) ? 1 : 0);
+  return list.sort((a, b) => rank(b) - rank(a));
+}
+function quizSourceText(m){
+  let out = "", page = 0;
+  m.paras.forEach(p => {
+    const first = p.t.find(t => t !== " "); const pg = first !== undefined ? m.items[first].p : page;
+    const t = p.t.map(x => x === " " ? " " : disp(m.items[x])).join("").replace(/\s+/g, " ").trim();
+    if (!t) return;
+    if (pg !== page){ out += "\n[Page " + pg + "]\n"; page = pg; }
+    out += (p.k === "h" ? "## " : "") + t + "\n\n";
+  });
+  return out.slice(0, 400000);
+}
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+async function makeQuiz(d, onStatus){
+  onStatus("Reading the paper…");
+  const src = await exportSource(d, false, onStatus);
+  const m = src && src.m;
+  const full = m ? quizSourceText(m) : "";
+  if (!full && !d.abstract) throw new Error("There’s no text to make questions from. The paper needs a readable PDF or at least an abstract.");
+  const prompt = [
+    "You are helping a researcher check their understanding of an academic paper they are reading.",
+    "Write exactly 20 multiple-choice questions about the paper below.",
+    "Cover: the research question and why it matters; key concepts and definitions; the methods and data; the main findings, including important numbers; how the authors interpret them; limitations; and how the paper positions itself against the work it cites.",
+    "Mix the difficulty: about 6 easy, 9 medium and 5 hard. Hard questions should test reasoning about the paper, not trivia.",
+    "Each question must have exactly 4 options with only one correct answer. Make the wrong options plausible to someone who skimmed, but clearly wrong to someone who read carefully. Do not use 'all of the above' or 'none of the above'. Vary which position holds the correct answer.",
+    "Every question must be answerable from the paper alone.",
+    "Write in clear, plain British English with short sentences.",
+    "For each question give answer_index (0 to 3), a one or two sentence explanation of why the answer is right, and the page number where the answer can be found, taken from the [Page N] markers (use 0 if unsure).",
+    "",
+    "Title: " + (d.title || "Untitled"),
+    d.authors && d.authors.length ? "Authors: " + fullAuthors(d.authors) : "",
+    d.year ? "Year: " + d.year : "",
+    d.abstract ? "Abstract: " + d.abstract : "",
+    "",
+    full ? "Full text:\n" + full : "(Only the abstract is available for this paper, so base the questions on it and keep them to what it supports.)"
+  ].filter(x => x !== "").join("\n");
+  const model = gem().model || "gemini-3.6-flash";
+  onStatus("Gemini is writing 20 questions. This usually takes 20 to 60 seconds…");
+  const body = await gemFetch("/models/" + encodeURIComponent(model) + ":generateContent", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: QUIZ_SCHEMA, temperature: 0.5 } })
+  }, 150000);
+  const cand = body && body.candidates && body.candidates[0];
+  if (!cand){ const why = body && body.promptFeedback && body.promptFeedback.blockReason; throw new Error(why ? "Gemini declined this paper (" + why + ")." : "Gemini didn’t return any questions."); }
+  const text = ((cand.content && cand.content.parts) || []).filter(p => !p.thought && typeof p.text === "string").map(p => p.text).join("");
+  let data;
+  try { data = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch (e) { throw new Error(cand.finishReason && cand.finishReason !== "STOP" ? "Gemini stopped early (" + cand.finishReason + "). Try again." : "Gemini’s answer couldn’t be read. Try again."); }
+  const qs = (data.questions || []).filter(q => q && q.question && Array.isArray(q.options) && q.options.length === 4 && q.options.every(o => typeof o === "string" && o.trim()) && Number.isInteger(q.answer_index) && q.answer_index >= 0 && q.answer_index < 4)
+    .slice(0, 20).map(q => ({ question: q.question.trim(), options: q.options.map(o => o.trim()), answer: q.answer_index, explanation: (q.explanation || "").trim(), page: q.page > 0 ? q.page : 0, difficulty: q.difficulty || "" }));
+  if (qs.length < 10) throw new Error("Gemini only produced " + qs.length + " usable questions. Try again.");
+  const quiz = { questions: qs, made: Date.now(), model: model, fromAbstract: !full, best: null, last: null };
+  await DB.set("quiz:" + d.id, quiz).catch(() => {});
+  return quiz;
+}
+function quizBody(...kids){ setKids($("#sheetBody"), ...kids); $("#sheet").scrollTop = 0; }
+function openGeminiSettings(after){
+  sheetMode = "quiz";
+  const g = gem();
+  const keyIn = el("input", { type: "password", autocomplete: "off", autocapitalize: "off", autocorrect: "off", placeholder: "Paste your Gemini API key", "aria-label": "Gemini API key" });
+  keyIn.value = g.key || "";
+  const modelSel = el("select", { "aria-label": "Gemini model" }, el("option", { value: g.model || "gemini-3.6-flash", text: g.model || "gemini-3.6-flash" }));
+  const status = el("p", { class: "hint", "aria-live": "polite" });
+  const check = el("button", { class: "btn line", text: "Check key and load models" });
+  check.addEventListener("click", async () => {
+    const k = keyIn.value.trim(); if (!k){ status.textContent = "Paste a key first."; return; }
+    lsSet(GEM_KEY, Object.assign(gem(), { key: k }));
+    check.disabled = true; status.textContent = "Checking…";
+    try {
+      const models = await gemModels();
+      if (!models.length) throw new Error("No suitable models were found for this key.");
+      const keep = gem().model;
+      modelSel.replaceChildren(...models.map(n => el("option", { value: n, text: n })));
+      modelSel.value = models.includes(keep) ? keep : models[0];
+      lsSet(GEM_KEY, Object.assign(gem(), { model: modelSel.value }));
+      status.textContent = "Key works. " + models.length + " models available.";
+    } catch (e) { status.textContent = e.message; }
+    check.disabled = false;
+  });
+  modelSel.addEventListener("change", () => lsSet(GEM_KEY, Object.assign(gem(), { model: modelSel.value })));
+  $("#sheetRight").replaceChildren();
+  quizBody(
+    el("h2", { text: "Gemini settings" }),
+    el("p", { text: "Quizzes are written by Google’s Gemini using your own API key. The key is saved only in this browser on this device and is sent only to Google." }),
+    el("ol", { class: "hint", style: "padding-left:1.2rem" },
+      el("li", {}, "Get a free key at ", el("a", { href: "https://aistudio.google.com/apikey", target: "_blank", rel: "noopener noreferrer", text: "aistudio.google.com/apikey" }), "."),
+      el("li", { text: "Paste it below and tap Check key." }),
+      el("li", { text: "Leave the model as suggested unless you want a different one." })),
+    el("label", { class: "field" }, el("span", { text: "API key" }), keyIn),
+    el("div", { class: "actions" }, check), status,
+    el("label", { class: "field" }, el("span", { text: "Model" }), modelSel),
+    el("p", { class: "hint", text: "On Gemini’s free tier, Google may use what you send to improve its products. Paid keys aren’t used that way." }),
+    el("div", { class: "actions" },
+      el("button", { class: "btn", text: after ? "Save and continue" : "Save", onclick: () => {
+        const k = keyIn.value.trim(); if (!k){ status.textContent = "Paste a key first."; return; }
+        lsSet(GEM_KEY, Object.assign(gem(), { key: k, model: modelSel.value }));
+        if (after) after(); else { sheetMode = "doc"; closeSheet(); toast("Gemini settings saved."); }
+      }}),
+      g.key ? el("button", { class: "btn danger", text: "Remove key", onclick: () => { localStorage.removeItem(GEM_KEY); toast("Gemini key removed from this device."); closeSheet(); } }) : null));
+  $("#sheet").classList.add("open");
+}
+async function openQuiz(docId){
+  const d = S.lib.get(docId); if (!d) return;
+  sheetId = null; sheetMode = "quiz";
+  $("#sheetRight").replaceChildren(el("button", { class: "btn quiet", text: "Gemini", onclick: () => openGeminiSettings(() => openQuiz(docId)) }));
+  $("#sheet").classList.add("open");
+  if (!gem().key){ openGeminiSettings(() => openQuiz(docId)); return; }
+  const saved = await DB.get("quiz:" + docId).catch(() => null);
+  if (saved && saved.questions && saved.questions.length){
+    quizBody(
+      el("h2", { text: "Quiz: " + (d.title || "this paper") }),
+      el("p", { text: "You have a saved quiz of " + saved.questions.length + " questions, made " + new Date(saved.made).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) + "." + (saved.best !== null ? " Best score " + saved.best + " of " + saved.questions.length + "." : "") }),
+      saved.fromAbstract ? el("p", { class: "hint", text: "It was made from the abstract only, as the PDF couldn’t be read." }) : null,
+      el("div", { class: "actions" },
+        el("button", { class: "btn", text: "Take it", onclick: () => runQuiz(d, saved, null) }),
+        el("button", { class: "btn line", text: "Make a new quiz", onclick: () => newQuiz(d) })));
+    return;
+  }
+  newQuiz(d);
+}
+async function newQuiz(d){
+  const status = el("p", { class: "hint", "aria-live": "polite", text: "Starting…" });
+  quizBody(el("h2", { text: "Making your quiz" }), el("p", { text: d.title || "" }), status,
+    el("p", { class: "hint", text: "Keep this screen open while Gemini works." }));
+  try {
+    const quiz = await makeQuiz(d, t => status.textContent = t);
+    if (sheetMode !== "quiz") return;
+    runQuiz(d, quiz, null);
+  } catch (e) {
+    if (sheetMode !== "quiz") return;
+    quizBody(el("h2", { text: "Couldn’t make the quiz" }), el("p", { class: "banner", text: e.message }),
+      el("div", { class: "actions" },
+        el("button", { class: "btn", text: "Try again", onclick: () => newQuiz(d) }),
+        el("button", { class: "btn line", text: "Gemini settings", onclick: () => openGeminiSettings(() => openQuiz(d.id)) })));
+  }
+}
+function runQuiz(d, quiz, only){
+  const order = shuffle((only || quiz.questions.map((q, i) => i)).slice());
+  const st = { i: 0, score: 0, wrong: [], order: order, opts: order.map(qi => shuffle([0, 1, 2, 3])) };
+  const dys = typeof RS !== "undefined" && RS.font === "dyslexic";
+  const show = () => {
+    if (sheetMode !== "quiz") return;
+    const qi = st.order[st.i], q = quiz.questions[qi], perm = st.opts[st.i];
+    let answered = false;
+    const fb = el("div", { "aria-live": "polite" });
+    const buttons = perm.map((oi, pos) => {
+      const b = el("button", { class: "quiz-opt" + (dys ? " dys" : "") },
+        el("span", { class: "quiz-letter", text: "ABCD"[pos] }), el("span", { text: q.options[oi] }));
+      b.addEventListener("click", () => {
+        if (answered) return; answered = true;
+        const ok = oi === q.answer;
+        if (ok) st.score++; else st.wrong.push({ qi: qi, chose: oi });
+        buttons.forEach((x, p2) => {
+          x.disabled = true;
+          if (perm[p2] === q.answer){ x.classList.add("right"); x.append(el("span", { class: "quiz-mark", text: " ✓" })); }
+          else if (x === b){ x.classList.add("wrong"); x.append(el("span", { class: "quiz-mark", text: " ✗" })); }
+        });
+        const correctPos = perm.indexOf(q.answer);
+        setKids(fb,
+          el("p", { class: "quiz-fb " + (ok ? "ok" : "no"), text: ok ? "Correct." : "Not quite. The answer is " + "ABCD"[correctPos] + "." }),
+          q.explanation ? el("p", { class: dys ? "dys" : "", text: q.explanation }) : null,
+          q.page ? el("p", { class: "hint", text: "See page " + q.page + " of the paper." }) : null,
+          el("div", { class: "actions" }, el("button", { class: "btn", text: st.i + 1 < st.order.length ? "Next question" : "See results", onclick: () => { st.i++; if (st.i < st.order.length) show(); else results(); } })));
+      });
+      return b;
+    });
+    quizBody(
+      el("p", { class: "hint", text: "Question " + (st.i + 1) + " of " + st.order.length + (q.difficulty ? " (" + q.difficulty + ")" : "") + ". Score so far: " + st.score + "." }),
+      el("div", { class: "quiz-bar" }, el("div", { style: "width:" + Math.round(st.i / st.order.length * 100) + "%" })),
+      el("h2", { class: "quiz-q" + (dys ? " dys" : ""), text: q.question }),
+      el("div", {}, ...buttons), fb);
+  };
+  const results = async () => {
+    const n = st.order.length;
+    if (!only){ quiz.last = st.score; quiz.best = quiz.best === null ? st.score : Math.max(quiz.best, st.score); await DB.set("quiz:" + d.id, quiz).catch(() => {}); }
+    quizBody(
+      el("h2", { text: "You got " + st.score + " of " + n }),
+      el("p", { text: st.score === n ? "Every one right. Well done." : st.score >= n * 0.8 ? "A strong result." : st.score >= n * 0.5 ? "A good start. Have another look at the ones you missed." : "Worth another read of the sections below, then try again." }),
+      st.wrong.length ? el("div", { class: "section" }, el("h3", { text: "The ones you missed" }),
+        ...st.wrong.map(w => { const q = quiz.questions[w.qi]; return el("div", { style: "padding:10px 0;border-top:1px solid var(--line)" },
+          el("p", { style: "font-weight:600;margin:0 0 4px", class: dys ? "dys" : "", text: q.question }),
+          el("p", { style: "margin:0 0 4px", text: "You chose: " + q.options[w.chose] }),
+          el("p", { style: "margin:0 0 4px", text: "Answer: " + q.options[q.answer] }),
+          q.explanation ? el("p", { class: "hint", style: "margin:0", text: q.explanation + (q.page ? " (page " + q.page + ")" : "") }) : null); })) : null,
+      el("div", { class: "actions" },
+        st.wrong.length ? el("button", { class: "btn", text: "Retry the " + st.wrong.length + " I missed", onclick: () => runQuiz(d, quiz, st.wrong.map(w => w.qi)) }) : null,
+        el("button", { class: st.wrong.length ? "btn line" : "btn", text: "Take the whole quiz again", onclick: () => runQuiz(d, quiz, null) }),
+        el("button", { class: "btn line", text: "Make a new quiz", onclick: () => newQuiz(d) }),
+        el("button", { class: "btn line", text: "Done", onclick: () => openSheet(d.id) })));
+  };
+  show();
 }
 
 /* ================= Export for Claude ================= */
