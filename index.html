@@ -117,6 +117,20 @@ textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:
 .quiz-fb{font-weight:700;margin:14px 0 6px}
 .quiz-bar{height:4px;background:var(--line);border-radius:2px;margin:4px 0 12px;overflow:hidden}
 .quiz-bar div{height:100%;background:var(--accent)}
+.impl-summary{font-size:1.02rem;line-height:1.55}
+.impl-rq{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0;background:var(--surface)}
+.impl-rq.quiet{opacity:.7}
+.impl-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.impl-id{font-weight:700;font-family:var(--serif);font-size:1.1rem}
+.impl-tag{display:inline-block;font-size:.8rem;font-weight:600;border-radius:999px;padding:2px 10px;border:1.5px solid var(--line)}
+.impl-tag.lvl-high{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.impl-tag.lvl-medium{border-color:var(--ink)}
+.impl-tag.lvl-low{border-style:dashed}
+.impl-tag.lvl-none{color:var(--muted)}
+.impl-q{font-size:.85rem;color:var(--muted);margin:6px 0}
+.impl-body{margin:6px 0;line-height:1.55}
+.impl-ev{margin:6px 0 0;padding-left:1.2rem;font-size:.92rem}
+.impl-ev li{margin-bottom:4px}
 
 /* ---------- Text reader ---------- */
 .rd{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;
@@ -809,7 +823,8 @@ function fillSheet(){
       el("button", { class: "btn line", text: "Edit details", onclick: () => openEdit(d.id) }),
       el("button", { class: "btn line", text: "Update from DOI or ISBN", onclick: () => openLookup(d.id) }),
       d.file_attached ? el("button", { class: "btn line", text: "E-book", onclick: () => openEbook([d], d.title || "Paper") }) : null,
-      d.file_attached || d.abstract ? el("button", { class: "btn line", text: "Quiz me", onclick: () => openQuiz(d.id) }) : null
+      d.file_attached || d.abstract ? el("button", { class: "btn line", text: "Quiz me", onclick: () => openQuiz(d.id) }) : null,
+      d.file_attached || d.abstract ? el("button", { class: "btn line", text: "My research", onclick: () => openImplications(d.id) }) : null
     ),
     doi ? el("div", { class: "section" }, el("h3", { text: "DOI" }), el("a", { class: "doi", href: "https://doi.org/" + encodeURI(doi), target: "_blank", rel: "noopener noreferrer", text: doi })) : null,
     !doi && web ? el("div", { class: "section" }, el("h3", { text: "Link" }), el("a", { class: "doi", href: web, target: "_blank", rel: "noopener noreferrer", text: web })) : null,
@@ -1117,7 +1132,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 15" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 16" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -2598,6 +2613,193 @@ function runQuiz(d, quiz, only){
         el("button", { class: "btn line", text: "Done", onclick: () => openSheet(d.id) })));
   };
   show();
+}
+
+/* ================= Implications for my research (Gemini) ================= */
+/*
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  YOUR RESEARCH: edit this block to change what papers are judged     │
+  │  against. Keep each question inside "quotes", one per line, with a   │
+  │  comma at the end of every line except the last. After editing,      │
+  │  upload index.html again. Saved analyses are redone automatically    │
+  │  when the questions change.                                          │
+  └──────────────────────────────────────────────────────────────────────┘
+*/
+const RESEARCH_CONTEXT =
+  "A doctoral study of the Unified Architecture Framework (UAF) and enterprise modelling, " +
+  "examining how the ontological and epistemological commitments built into UAF compare " +
+  "with those of theories and practices of strategy.";
+const RESEARCH_QUESTIONS = [
+  { id: "RQ1", text: "What ontological and epistemological commitments concerning strategy are embedded in UAF and the enterprise-modelling theory and practice associated with its use?" },
+  { id: "RQ2", text: "What ontological and epistemological commitments are embedded in major theories of strategy, and how are these manifested in strategic practice?" },
+  { id: "RQ3", text: "Where, and under what conditions, are the commitments embedded in UAF congruent or incongruent with those associated with different forms of strategic activity, and what does this imply for UAF's capacity to represent and support them?" },
+  { id: "RQ4", text: "Which identified limitations are contingent and remediable and which arise from fundamental constraints?" },
+  { id: "RQ5", text: "How should UAF be deployed, adapted or complemented to support different forms of strategic activity in light of these findings?" }
+];
+/* ── end of the editable block ───────────────────────────────────────── */
+
+const LEVELS = ["high", "medium", "low", "none"];
+const IMPL_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    overall_relevance: { type: "STRING", enum: LEVELS },
+    summary: { type: "STRING" },
+    research_questions: { type: "ARRAY", items: { type: "OBJECT", properties: {
+      id: { type: "STRING" },
+      relevance: { type: "STRING", enum: LEVELS },
+      role: { type: "STRING", enum: ["supports", "challenges", "extends", "method", "background", "not relevant"] },
+      implications: { type: "STRING" },
+      evidence: { type: "ARRAY", items: { type: "OBJECT", properties: { point: { type: "STRING" }, page: { type: "INTEGER" } }, required: ["point"] } }
+    }, required: ["id", "relevance", "implications"] } },
+    cross_cutting: { type: "STRING" },
+    cautions: { type: "STRING" },
+    follow_up: { type: "ARRAY", items: { type: "STRING" } }
+  },
+  required: ["overall_relevance", "summary", "research_questions"]
+};
+function rqHash(){
+  const s = RESEARCH_CONTEXT + "|" + RESEARCH_QUESTIONS.map(q => q.id + ":" + q.text).join("|");
+  let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+async function makeImplications(d, onStatus){
+  onStatus("Reading the paper…");
+  const src = await exportSource(d, false, onStatus);
+  const m = src && src.m;
+  const full = m ? quizSourceText(m) : "";
+  if (!full && !d.abstract) throw new Error("There’s no text to analyse. The paper needs a readable PDF or at least an abstract.");
+  const prompt = [
+    "You are assisting a doctoral researcher. Judge what the paper below means for their research, question by question.",
+    "",
+    "Research context: " + RESEARCH_CONTEXT,
+    "Research questions:",
+    ...RESEARCH_QUESTIONS.map(q => q.id + ": " + q.text),
+    "",
+    "Instructions:",
+    "- Be honest about relevance. Many papers matter for only one or two questions, and some for none. Never stretch a weak link; say 'none' or 'low' when that is the truth.",
+    "- For each research question, explain the implications concretely: what the paper offers, whether it supports, challenges or extends the line of inquiry, or provides a method or background, and how the researcher might use it (for example as evidence, a counter-argument, a framework or a definition).",
+    "- Pay particular attention to ontological and epistemological assumptions, whether stated or implicit, since these are central to the research.",
+    "- Ground every point in the paper. Give the page number from the [Page N] markers for each piece of evidence (0 if unsure). Paraphrase rather than quote.",
+    "- 'cross_cutting' should note anything that bears on several questions at once or on the research design as a whole.",
+    "- 'cautions' should note weaknesses, biases, scope limits or reasons to treat the paper carefully.",
+    "- 'follow_up' should list up to five works cited in the paper that look worth reading for this research, each with a few words on why.",
+    "- Write in clear, plain British English with short sentences. Keep each implications section to roughly 60 to 150 words.",
+    "- Return one entry in research_questions for every question, using the ids exactly as given.",
+    "",
+    "Paper title: " + (d.title || "Untitled"),
+    d.authors && d.authors.length ? "Authors: " + fullAuthors(d.authors) : "",
+    d.year ? "Year: " + d.year : "",
+    d.source ? "Published in: " + d.source : "",
+    d.abstract ? "Abstract: " + d.abstract : "",
+    "",
+    full ? "Full text:\n" + full : "(Only the abstract is available. Base the analysis on it and say clearly that it is limited.)"
+  ].filter(x => x !== "").join("\n");
+  const model = gem().model || "gemini-3.6-flash";
+  onStatus("Gemini is weighing the paper against your research questions. This usually takes 20 to 60 seconds…");
+  const body = await gemFetch("/models/" + encodeURIComponent(model) + ":generateContent", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: IMPL_SCHEMA, temperature: 0.3 } })
+  }, 150000);
+  const cand = body && body.candidates && body.candidates[0];
+  if (!cand){ const why = body && body.promptFeedback && body.promptFeedback.blockReason; throw new Error(why ? "Gemini declined this paper (" + why + ")." : "Gemini didn’t return an analysis."); }
+  const text = ((cand.content && cand.content.parts) || []).filter(p => !p.thought && typeof p.text === "string").map(p => p.text).join("");
+  let a;
+  try { a = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch (e) { throw new Error(cand.finishReason && cand.finishReason !== "STOP" ? "Gemini stopped early (" + cand.finishReason + "). Try again." : "Gemini’s answer couldn’t be read. Try again."); }
+  const byId = new Map((a.research_questions || []).map(r => [String(r.id || "").toUpperCase(), r]));
+  const result = {
+    overall: LEVELS.includes(a.overall_relevance) ? a.overall_relevance : "low",
+    summary: (a.summary || "").trim(),
+    rqs: RESEARCH_QUESTIONS.map(q => {
+      const r = byId.get(q.id.toUpperCase()) || {};
+      return { id: q.id, relevance: LEVELS.includes(r.relevance) ? r.relevance : "none", role: r.role || "", implications: (r.implications || "No implications identified.").trim(),
+        evidence: (r.evidence || []).filter(e => e && e.point).map(e => ({ point: e.point.trim(), page: e.page > 0 ? e.page : 0 })) };
+    }),
+    cross: (a.cross_cutting || "").trim(), cautions: (a.cautions || "").trim(),
+    follow: (a.follow_up || []).map(x => String(x).trim()).filter(Boolean).slice(0, 5),
+    fromAbstract: !full, made: Date.now(), model: model, hash: rqHash()
+  };
+  await DB.set("impl:" + d.id, result).catch(() => {});
+  return result;
+}
+function implText(d, r){
+  const L = [];
+  L.push("Implications for my research: " + (d.title || "Untitled") + (d.year ? " (" + d.year + ")" : ""));
+  L.push("Overall relevance: " + r.overall, "", r.summary, "");
+  r.rqs.forEach(x => {
+    const q = RESEARCH_QUESTIONS.find(y => y.id === x.id);
+    L.push(x.id + " (" + x.relevance + (x.role && x.role !== "not relevant" ? ", " + x.role : "") + ")" + (q ? ": " + q.text : ""));
+    L.push(x.implications);
+    x.evidence.forEach(e => L.push("  - " + e.point + (e.page ? " (p. " + e.page + ")" : "")));
+    L.push("");
+  });
+  if (r.cross) L.push("Across the questions: " + r.cross, "");
+  if (r.cautions) L.push("Cautions: " + r.cautions, "");
+  if (r.follow.length) L.push("Worth following up:", ...r.follow.map(f => "  - " + f));
+  return L.join("\n");
+}
+const LEVEL_LABEL = { high: "High relevance", medium: "Medium relevance", low: "Low relevance", none: "Not relevant" };
+function showImplications(d, r){
+  const stale = r.hash !== rqHash();
+  const rqBlock = x => {
+    const q = RESEARCH_QUESTIONS.find(y => y.id === x.id);
+    const quiet = x.relevance === "none";
+    return el("div", { class: "impl-rq" + (quiet ? " quiet" : "") },
+      el("div", { class: "impl-head" },
+        el("span", { class: "impl-id", text: x.id }),
+        el("span", { class: "impl-tag lvl-" + x.relevance, text: LEVEL_LABEL[x.relevance] + (x.role && x.role !== "not relevant" && !quiet ? ", " + x.role : "") })),
+      q ? el("p", { class: "impl-q", text: q.text }) : null,
+      el("p", { class: "impl-body", text: x.implications }),
+      x.evidence.length ? el("ul", { class: "impl-ev" }, ...x.evidence.map(e => el("li", { text: e.point + (e.page ? " (p. " + e.page + ")" : "") }))) : null);
+  };
+  quizBody(
+    el("h2", { text: "Implications for your research" }),
+    el("p", { class: "meta", text: (d.title || "") + (d.year ? " (" + d.year + ")" : "") }),
+    el("p", {}, el("span", { class: "impl-tag lvl-" + r.overall, text: "Overall: " + LEVEL_LABEL[r.overall] })),
+    stale ? el("p", { class: "banner", text: "Your research questions have changed since this was made. Tap Redo to update it." }) : null,
+    r.fromAbstract ? el("p", { class: "hint", text: "Based on the abstract only, as the PDF couldn’t be read." }) : null,
+    el("p", { class: "impl-summary", text: r.summary }),
+    ...r.rqs.slice().sort((a, b) => LEVELS.indexOf(a.relevance) - LEVELS.indexOf(b.relevance)).map(rqBlock),
+    r.cross ? el("div", { class: "section" }, el("h3", { text: "Across the questions" }), el("p", { text: r.cross })) : null,
+    r.cautions ? el("div", { class: "section" }, el("h3", { text: "Cautions" }), el("p", { text: r.cautions })) : null,
+    r.follow.length ? el("div", { class: "section" }, el("h3", { text: "Worth following up" }), el("ul", { class: "impl-ev" }, ...r.follow.map(f => el("li", { text: f })))) : null,
+    el("p", { class: "hint", text: "Written by " + r.model + " on " + new Date(r.made).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) + ". Check page references before citing." }),
+    el("div", { class: "actions" },
+      el("button", { class: "btn", text: "Copy as text", onclick: async () => toast(await copyTextSafe(implText(d, r)) ? "Copied." : "Couldn’t copy. Your browser blocked it.") }),
+      el("button", { class: "btn line", text: "Redo", onclick: () => newImplications(d) }),
+      el("button", { class: "btn line", text: "Done", onclick: () => openSheet(d.id) })));
+}
+async function copyTextSafe(t){
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.append(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e2) {}
+    ta.remove(); return ok;
+  }
+}
+async function openImplications(docId){
+  const d = S.lib.get(docId); if (!d) return;
+  sheetId = null; sheetMode = "quiz";
+  $("#sheetRight").replaceChildren(el("button", { class: "btn quiet", text: "Gemini", onclick: () => openGeminiSettings(() => openImplications(docId)) }));
+  $("#sheet").classList.add("open");
+  if (!gem().key){ openGeminiSettings(() => openImplications(docId)); return; }
+  const saved = await DB.get("impl:" + docId).catch(() => null);
+  if (saved && saved.rqs) showImplications(d, saved); else newImplications(d);
+}
+async function newImplications(d){
+  const status = el("p", { class: "hint", "aria-live": "polite", text: "Starting…" });
+  quizBody(el("h2", { text: "Analysing the paper" }), el("p", { text: d.title || "" }), status,
+    el("p", { class: "hint", text: "Keep this screen open while Gemini works." }));
+  try {
+    const r = await makeImplications(d, t => status.textContent = t);
+    if (sheetMode !== "quiz") return;
+    showImplications(d, r);
+  } catch (e) {
+    if (sheetMode !== "quiz") return;
+    quizBody(el("h2", { text: "Couldn’t analyse the paper" }), el("p", { class: "banner", text: e.message }),
+      el("div", { class: "actions" },
+        el("button", { class: "btn", text: "Try again", onclick: () => newImplications(d) }),
+        el("button", { class: "btn line", text: "Gemini settings", onclick: () => openGeminiSettings(() => openImplications(d.id)) })));
+  }
 }
 
 /* ================= Export for Claude ================= */
