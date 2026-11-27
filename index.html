@@ -1117,7 +1117,7 @@ function buildSettings(){
     synth ? el("div", { class: "grp" }, el("span", { class: "lab", text: "Voice speed" }),
       ...RATES.map(r => opt(r + "×", (RS.rate || 1) === r, () => { RS.rate = r; if (TTS.playing) ttsSpeak(TTS.idx); else updatePlayer(); }))) : null,
     synth ? el("p", { class: "hint", style: "margin-top:8px", text: "For more natural voices, download them in Settings, Accessibility, Spoken Content, Voices, English. After downloading, fully close Safari (swipe it away in the app switcher) and reopen it, or the new voice won’t show up here." }) : null,
-    el("p", { class: "hint", style: "margin-top:12px", text: "App version 14" })
+    el("p", { class: "hint", style: "margin-top:12px", text: "App version 15" })
   );
 }
 $("#rdSetBtn").addEventListener("click", () => {
@@ -2546,7 +2546,7 @@ async function newQuiz(d){
 function runQuiz(d, quiz, only){
   const order = shuffle((only || quiz.questions.map((q, i) => i)).slice());
   const st = { i: 0, score: 0, wrong: [], order: order, opts: order.map(qi => shuffle([0, 1, 2, 3])) };
-  const dys = typeof RS !== "undefined" && RS.font === "dyslexic";
+  const dys = false; // quizzes always use the app’s standard font
   const show = () => {
     if (sheetMode !== "quiz") return;
     const qi = st.order[st.i], q = quiz.questions[qi], perm = st.opts[st.i];
